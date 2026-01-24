@@ -8,7 +8,7 @@ const db = mysql.createPool({
     database: process.env.DB_NAME,
     port: process.env.DB_PORT || 3306,
     ssl: {
-        rejectUnauthorized: false // Required for Railway's SSL
+        rejectUnauthorized: false
     }
 });
 
