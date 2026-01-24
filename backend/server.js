@@ -7,6 +7,12 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// routes
+const authRoutes = require('./routes/Auth');
+
+app.use("/api/auth", authRoutes);
+
+
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
