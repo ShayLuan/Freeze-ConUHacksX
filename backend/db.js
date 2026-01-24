@@ -1,8 +1,6 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-// Railway provides TCP proxy port via environment variable
-// Use RAILWAY_TCP_PROXY_PORT if available, otherwise use DB_PORT
 const port = process.env.RAILWAY_TCP_PROXY_PORT || process.env.DB_PORT || 3306;
 
 // Log connection details (without password) for debugging
@@ -40,13 +38,6 @@ db.getConnection()
     .catch(err => {
         console.error('❌ Database connection error:', err.message);
         console.error('Error code:', err.code);
-        console.error('\n🔧 Troubleshooting tips:');
-        console.error('1. Railway MySQL uses a TCP proxy port (NOT 3306)');
-        console.error('2. Go to Railway dashboard → Your MySQL service → Connect tab');
-        console.error('3. Look for connection string like: mysql://user:pass@host:PORT/db');
-        console.error('4. The PORT number is what you need (e.g., 26206, 57528, etc.)');
-        console.error('5. Update DB_PORT in your .env file with the correct port number');
-        console.error('6. Or Railway may provide RAILWAY_TCP_PROXY_PORT automatically');
     });
 
 module.exports = db;
