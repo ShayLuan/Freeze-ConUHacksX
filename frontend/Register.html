@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CRB Register</title>
+    <title>Login-Register</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -25,11 +25,47 @@
       </nav>
     </header>
 
-    <main>
+    <main class= "auth-container">
+      <section id="login-frame"> 
+        <h1>Login To Your Account</h1>
+        <!-- INCORRECT PASSWORD OR E-MAIL WARNING -->
+        <p id="errorMsg" style="color: red; display: none; margin-bottom: 10px;">
+          Incorrect email or password.
+        </p>
+
+        <form action="/Login" method="POST" id="login-form">
+          <label for="login-email"></label>
+          <input
+            type="email"
+            id="login-email"
+            name="email"
+            placeholder="Email Address"
+            required
+          />
+          
+          <label for="login-password"></label>
+          <input
+            type="password"
+            id="login-password"
+            name="password"
+            placeholder="Password"
+            required
+          />
+
+          <button type="submit" class="button">Log in</button>
+        </form>
+        <p id="login-error" style="color: #c0392b; margin-top: 8px;"></p>
+
+        
+          <a id="forgot-password" href="ForgotPassword.html"
+            >Forgot password?</a
+          >
+    
+      </section>
       <section id="register-frame">
         <h1>Create Your Account</h1>
         <form action="/Register" method="POST" id="register-form">
-          <label for="name">Full Name</label>
+          <label for="name">Username</label>
           <input type="text" id="name" name="name"  />
 
           <label for="email">Email Address</label>
@@ -50,7 +86,7 @@
         </form>
         <p id="register-error" style="color: #c0392b; margin-top: 8px;"></p>
 
-        <p>Already have an account? <a href="Login.html">Log in</a></p>
+      
       </section>
     </main>
 
@@ -61,3 +97,5 @@
     <script type="text/javascript" src="Register.js" ;></script>
   </body>
 </html>
+
+
