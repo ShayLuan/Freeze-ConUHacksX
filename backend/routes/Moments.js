@@ -1,5 +1,7 @@
 const express = require("express");
+const multer = require("multer");
 const router = express.Router();
+const { upload, uploadToCloudinary } = require("../utils/upload");
 
 // GET all moments for a specific user
 router.get("/", async (req, res) => {
@@ -31,8 +33,23 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST create a new moment for a user
-router.post("/", async (req, res) => {
+// POST create a new moment for a user (with optional image upload)
+router.post("/", (req, res, next) => {
+  upload.single("image")(req, res, (err) => {
+    if (err) {
+      // Handle multer errors
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+        }
+        return res.status(400).json({ error: err.message });
+      }
+      // Handle other errors (like file type)
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { user_id, moments_url, date, description, reminder } = req.body;
@@ -58,22 +75,46 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Insert new moment
+    // Handle moments_url - it's NOT NULL, so use empty string if no image
+    let imageUrl = moments_url || '';
+
+    // If a file was uploaded, upload it to Cloudinary
+    if (req.file) {
+      try {
+        imageUrl = await uploadToCloudinary(req.file.buffer, "moments");
+        console.log("✅ Image uploaded to Cloudinary:", imageUrl);
+      } catch (uploadError) {
+        console.error("Error uploading to Cloudinary:", uploadError);
+        return res.status(500).json({ error: "Failed to upload image. Please try again." });
+      }
+    }
+
+    // Calculate the next moments_id for this user (moments_id is NOT auto_increment)
+    // Since moments_id is part of composite primary key (user_id, moments_id)
+    const [maxMoment] = await db.query(
+      "SELECT COALESCE(MAX(moments_id), 0) + 1 AS next_id FROM Moments WHERE user_id = ?",
+      [userId]
+    );
+    const momentsId = maxMoment[0]?.next_id || 1;
+
+    // Insert new moment with moments_id (required since it's NOT auto_increment)
+    // moments_url must be provided (NOT NULL constraint) - using empty string if no image
     const [result] = await db.query(
-      "INSERT INTO Moments (user_id, moments_url, date, description, reminder) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO Moments (moments_id, user_id, moments_url, date, description, reminder) VALUES (?, ?, ?, ?, ?, ?)",
       [
+        momentsId,
         userId,
-        moments_url || null,
+        imageUrl, // Empty string if no image (NOT NULL constraint)
         date || null,
         description || null,
         reminder !== undefined ? reminder : null,
       ]
     );
 
-    // Fetch the created moment
+    // Fetch the created moment using the composite key
     const [newMoment] = await db.query(
-      "SELECT * FROM Moments WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-      [userId]
+      "SELECT * FROM Moments WHERE moments_id = ? AND user_id = ?",
+      [momentsId, userId]
     );
 
     res.status(201).json({
@@ -87,9 +128,7 @@ router.post("/", async (req, res) => {
 });
 
 // DELETE a moment (only if it belongs to the user)
-// IMPORTANT: Adjust queries based on your actual Moments table schema
-// If Moments has moment_id as PK: use "WHERE moment_id = ? AND user_id = ?"
-// If Moments has user_id as PK: use "WHERE user_id = ?"
+// Uses composite primary key: (moments_id, user_id)
 router.delete("/:momentId", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -108,12 +147,9 @@ router.delete("/:momentId", async (req, res) => {
       return res.status(400).json({ error: "Invalid user_id or moment_id" });
     }
 
-    // Check if the moment exists and belongs to this user
-    // TODO: Adjust this query based on your actual schema
-    // If you have moment_id as PK: "SELECT user_id FROM Moments WHERE moment_id = ? AND user_id = ?"
-    // If user_id is the PK: "SELECT user_id FROM Moments WHERE user_id = ?"
+    // Check if the moment exists and belongs to this user using composite key
     const [moment] = await db.query(
-      "SELECT user_id FROM Moments WHERE user_id = ? AND user_id = ? LIMIT 1",
+      "SELECT user_id FROM Moments WHERE moments_id = ? AND user_id = ?",
       [momentIdInt, userId]
     );
 
@@ -126,10 +162,9 @@ router.delete("/:momentId", async (req, res) => {
       return res.status(403).json({ error: "Unauthorized: You can only delete your own moments" });
     }
 
-    // Delete the moment
-    // TODO: Adjust this query - if moment_id is PK: "DELETE FROM Moments WHERE moment_id = ? AND user_id = ?"
+    // Delete the moment using composite key
     await db.query(
-      "DELETE FROM Moments WHERE user_id = ? AND user_id = ? LIMIT 1",
+      "DELETE FROM Moments WHERE moments_id = ? AND user_id = ?",
       [momentIdInt, userId]
     );
 
