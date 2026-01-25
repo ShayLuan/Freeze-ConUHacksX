@@ -20,9 +20,9 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "Invalid user_id" });
     }
 
-    // fetch moments
+    // fetch moments (newest first)
     const [moments] = await db.query(
-      "SELECT * FROM Moments WHERE user_id = ? ORDER BY date ASC, created_at ASC",
+      "SELECT * FROM Moments WHERE user_id = ? ORDER BY date DESC, created_at DESC",
       [userId]
     );
 

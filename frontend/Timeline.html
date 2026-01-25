@@ -422,6 +422,8 @@
         try {
           await addMoment({ caption, dateISO, imageFile }, { scrollToIt: true, saveToDB: true });
           closeModal();
+          // Reload moments from database to ensure consistency
+          await loadUserMoments();
         } catch (error) {
           showError("Failed to save moment. Please try again.");
         } finally {
@@ -458,13 +460,18 @@
       // Load moments from API
       async function loadUserMoments() {
         try {
+          console.log('Loading moments for user_id:', currentUser.user_id);
           const response = await fetch(`${API_BASE}/api/moments?user_id=${currentUser.user_id}`);
-          const data = await response.json();
           
           if (!response.ok) {
-            console.error('Error loading moments:', data.error);
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Error loading moments:', response.status, errorData);
+            showError('Failed to load moments. Please refresh the page.');
             return;
           }
+          
+          const data = await response.json();
+          console.log('Loaded moments:', data.moments?.length || 0, 'moments');
           
           // Clear existing moments
           timeline.innerHTML = '<div class="timeline-rope"></div>';
@@ -472,7 +479,11 @@
           // Add moments from database
           if (data.moments && data.moments.length > 0) {
             data.moments.forEach(moment => {
-              addMomentToTimeline(moment, { scrollToIt: false, saveToDB: false });
+              try {
+                addMomentToTimeline(moment, { scrollToIt: false, saveToDB: false });
+              } catch (err) {
+                console.error('Error adding moment to timeline:', err, moment);
+              }
             });
           } else {
             // Show message if no moments
@@ -488,6 +499,7 @@
           adjustTimelineWidth();
         } catch (error) {
           console.error('Error fetching moments:', error);
+          showError('Unable to load moments. Please refresh the page.');
         }
       }
 
@@ -595,8 +607,21 @@
       // Function to add a moment from database (already saved)
       function addMomentToTimeline(momentData, opts = { scrollToIt: false, saveToDB: false }) {
         const caption = momentData.description || momentData.caption || 'Untitled Moment';
-        const dateISO = momentData.date || momentData.created_at ? momentData.created_at.split('T')[0] : toISODate(new Date());
-        
+        // Use date field, or fallback to created_at date part, or use today
+        let dateISO = momentData.date;
+        if (!dateISO && momentData.created_at) {
+          dateISO = momentData.created_at.split('T')[0];
+        }
+        if (!dateISO) {
+          dateISO = toISODate(new Date());
+        }
+        // Normalize to YYYY-MM-DD (DB may return 2026-01-24T00:00:00.000Z)
+        if (typeof dateISO === "string" && dateISO.includes("T")) {
+          dateISO = dateISO.split("T")[0];
+        }
+        dateISO = String(dateISO).trim();
+
+        // Pass moments_url (can be empty string, which is valid)
         addMoment({ caption, dateISO, moments_url: momentData.moments_url }, opts);
       }
 
@@ -611,15 +636,14 @@
         scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
       }
 
-      // chronological order
+      // Insert in reverse chronological order (newest first)
       function insertMomentInOrder(momentDiv, dateISO) {
         const existingMoments = Array.from(timeline.querySelectorAll('.moment'));
         
-        // position finder 
         let insertBefore = null;
         for (let i = 0; i < existingMoments.length; i++) {
           const existingDate = existingMoments[i].dataset.date;
-          if (existingDate && dateISO < existingDate) {
+          if (existingDate && dateISO > existingDate) {
             insertBefore = existingMoments[i];
             break;
           }
@@ -629,7 +653,6 @@
         if (insertBefore) {
           timeline.insertBefore(momentDiv, insertBefore);
         } else {
-          // If no earlier moment found, append to end
           timeline.appendChild(momentDiv);
         }
       }
@@ -671,8 +694,15 @@
       }
 
       function formatDate(iso) {
-        const [y, m, d] = iso.split("-").map(Number);
-        return `${m}/${d}/${y}`; // MM/DD/YYYY
+        if (!iso) return "";
+        // why the f is the date an NaN
+        const datePart = typeof iso === "string" && iso.includes("T")
+          ? iso.split("T")[0]
+          : String(iso).trim();
+        const parts = datePart.split("-").map(Number);
+        if (parts.length < 3 || parts.some((n) => isNaN(n))) return datePart;
+        const [y, m, d] = parts;
+        return `${m}/${d}/${y}`; 
       }
     });
   </script>
