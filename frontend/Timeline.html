@@ -36,6 +36,13 @@
   }
 
   .container{ max-width:1200px; margin:0 auto; }
+  
+  /* Remove max-width constraint for container when it contains timeline */
+  .container:has(.timeline-container){
+    max-width:none;
+    width:100%;
+    padding:0 20px; /* Maintain some side padding */
+  }
 
   header{ text-align:center; margin-bottom:30px; padding-top:20px; }
 
@@ -76,7 +83,7 @@
     height:100%;
     z-index:2;
     min-width:1200px;            /* JS will adjust */
-    padding:0 40px;              /* breathing room at ends */
+    padding:0 300px 0 40px;      /* extra right padding for infinite scroll effect */
     overflow:visible;            /* Allow shadows to extend beyond */
   }
 
@@ -962,6 +969,7 @@
 
       function adjustTimelineWidth() {
         // include rope padding; each moment/stack is ~180 + 80 margins => ~260
+        // if padding doesn't fix this, i don't know what will
         const count = timeline.querySelectorAll(".moment, .moment-stack").length;
         timeline.style.minWidth = `${Math.max(1200, count * 260)}px`;
       }
