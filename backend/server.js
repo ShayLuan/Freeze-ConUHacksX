@@ -16,8 +16,10 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 
 // routes
 const authRoutes = require('./routes/Auth');
+const momentsRoutes = require('./routes/Moments');
 
 app.use("/api/auth", authRoutes);
+app.use("/api/moments", momentsRoutes);
 
 // make db available locally
 app.locals.db = db;
@@ -33,6 +35,10 @@ app.get('/login', (req, res) => {
 
 app.get('/signup', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/Register.html'));
+});
+
+app.get('/timeline', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/Timeline.html'));
 });
 
 app.listen(port, () => {

@@ -1,23 +1,405 @@
 <!DOCTYPE html>
 <html lang="en">
-    
 <head>
-    <title> Moments </title>
-    <link rel="stylesheet" href="Timeline.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    </head>
-    
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-top: 20px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .timeline-container {
+            position: relative;
+            height: 300px;
+            margin: 40px 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 20px 0;
+            scrollbar-width: thin;
+            scrollbar-color: #888 #f0f0f0;
+        }
+
+        .timeline-container::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .timeline-container::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+
+        .timeline-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .timeline-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .timeline-rope {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to right, #e74c3c, #f39c12, #2ecc71, #3498db);
+            transform: translateY(-50%);
+            z-index: 1;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .timeline {
+            display: flex;
+            align-items: center;
+            min-width: 2000px; /* Initial wide width for horizontal scrolling */
+            height: 100%;
+            position: relative;
+            z-index: 2;
+        }
+
+        .moment {
+            position: relative;
+            margin: 0 40px;
+            transform: rotate(-2deg);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            z-index: 3;
+        }
+
+        .moment:hover {
+            transform: rotate(2deg) scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        .polaroid {
+            background: white;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            border-radius: 5px;
+            width: 180px;
+            text-align: center;
+            position: relative;
+            border: 1px solid #eee;
+        }
+
+        .polaroid::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            background: #e74c3c;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+        }
+
+        .photo-placeholder {
+            width: 100%;
+            height: 140px;
+            background: #ecf0f1;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .photo-placeholder img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-placeholder i {
+            color: #95a5a6;
+            font-size: 2rem;
+        }
+
+        .caption {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            font-style: italic;
+            min-height: 20px;
+        }
+
+        .add-moment-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498db, #2ecc71);
+            color: white;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .add-moment-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .instructions {
+            text-align: center;
+            color: #7f8c8d;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .timeline {
+                min-width: 3000px;
+            }
+            
+            .moment {
+                margin: 0 30px;
+            }
+            
+            .polaroid {
+                width: 150px;
+            }
+        }
+    </style>
+</head>
 <body>
-    <h1> Your Moments </h1>
-    <hr>
-    <div id="timeline-container">
+    <div class="container">
+        <header>
+            <h1>Memory Timeline</h1>
+            <p class="subtitle">Scroll horizontally to explore your moments</p>
+        </header>
+
+        <div class="timeline-container">
+            <div class="timeline-rope"></div>
+            <div class="timeline" id="timeline">
+                <!-- Moments will be added here dynamically -->
+            </div>
+        </div>
+
+        <div class="instructions">
+            <p>← Scroll left and right to navigate through your memories →</p>
+        </div>
     </div>
-    <div id="timeline-line"> </div> 
-    <button id="freeze-button" title="Freeze a moment!">
-    ❄️ </button>
-   
-      
-    </body>
 
+    <button class="add-moment-btn" id="addMomentBtn">+</button>
 
+    <script>
+        const API_BASE = "";
+        let currentUser = null;
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if user is logged in
+            const userStr = sessionStorage.getItem('user');
+            if (!userStr) {
+                // Redirect to login if not authenticated
+                window.location.href = '/login';
+                return;
+            }
+
+            try {
+                currentUser = JSON.parse(userStr);
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+                window.location.href = '/login';
+                return;
+            }
+
+            const timeline = document.getElementById('timeline');
+            const addBtn = document.getElementById('addMomentBtn');
+            
+            // Load user's moments from database
+            await loadUserMoments();
+            
+            // Function to generate random pastel color for image placeholder
+            function getRandomImageColor() {
+                const colors = [
+                    '#FF9AA2', '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', 
+                    '#C7CEEA', '#F8B195', '#F67280', '#C06C84', '#6C5B7B'
+                ];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            
+            // Load moments from API
+            async function loadUserMoments() {
+                try {
+                    const response = await fetch(`${API_BASE}/api/moments?user_id=${currentUser.user_id}`);
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        console.error('Error loading moments:', data.error);
+                        return;
+                    }
+                    
+                    // Clear existing moments
+                    timeline.innerHTML = '';
+                    
+                    // Add moments from database
+                    if (data.moments && data.moments.length > 0) {
+                        data.moments.forEach(moment => {
+                            addMomentToTimeline(moment, false); // false = don't save to DB (already saved)
+                        });
+                    } else {
+                        // Show message if no moments
+                        const emptyMsg = document.createElement('div');
+                        emptyMsg.style.textAlign = 'center';
+                        emptyMsg.style.color = '#7f8c8d';
+                        emptyMsg.style.padding = '40px';
+                        emptyMsg.textContent = 'No moments yet. Click the + button to add your first moment!';
+                        timeline.appendChild(emptyMsg);
+                    }
+                    
+                    adjustTimelineWidth();
+                } catch (error) {
+                    console.error('Error fetching moments:', error);
+                }
+            }
+            
+            // Function to add a moment to the timeline (and optionally save to database)
+            async function addMomentToTimeline(momentData, saveToDB = true) {
+                // If it's a database moment object, use its data
+                const caption = momentData.description || momentData.caption || 'Untitled Moment';
+                const imageUrl = momentData.moments_url || null;
+                const color = getRandomImageColor();
+                
+                const momentDiv = document.createElement('div');
+                momentDiv.className = 'moment';
+                momentDiv.dataset.momentId = momentData.user_id || null; // Store moment ID if available
+                
+                const imageContent = imageUrl 
+                    ? `<img src="${imageUrl}" alt="${caption}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
+                    : '<i>📷</i>';
+                
+                momentDiv.innerHTML = `
+                    <div class="polaroid">
+                        <div class="photo-placeholder" style="background-color: ${color}">
+                            ${imageContent}
+                        </div>
+                        <div class="caption">${caption}</div>
+                    </div>
+                `;
+                
+                timeline.appendChild(momentDiv);
+                
+                // Save to database if this is a new moment
+                if (saveToDB && currentUser) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/moments`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: currentUser.user_id,
+                                description: caption,
+                                moments_url: imageUrl,
+                                date: new Date().toISOString().split('T')[0], // Today's date
+                                reminder: 0
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (!response.ok) {
+                            console.error('Error saving moment:', data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error saving moment to database:', error);
+                    }
+                }
+                
+                // Smooth scroll to the new moment
+                momentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                adjustTimelineWidth();
+            }
+            
+            // Event listener for the add button
+            addBtn.addEventListener('click', async function() {
+                if (!currentUser) {
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                const captions = [
+                    "Adventure", "Achievement", "Celebration", "Nature", "Art", 
+                    "Music", "Food", "Sports", "Learning", "Relaxing"
+                ];
+                const randomCaption = captions[Math.floor(Math.random() * captions.length)];
+                
+                // Create a temporary moment object
+                const newMoment = {
+                    description: randomCaption,
+                    moments_url: null,
+                    caption: randomCaption
+                };
+                
+                await addMomentToTimeline(newMoment, true); // Save to database
+            });
+            
+            // Make sure timeline is wide enough for scrolling
+            function adjustTimelineWidth() {
+                const numMoments = document.querySelectorAll('.moment').length;
+                if (numMoments > 0) {
+                    timeline.style.minWidth = `${numMoments * 220}px`; // 180px width + 40px margins
+                } else {
+                    timeline.style.minWidth = '2000px';
+                }
+            }
+            
+            // Adjust when adding new moments
+            const observer = new MutationObserver(function(mutations) {
+                adjustTimelineWidth();
+            });
+            
+            observer.observe(timeline, { childList: true });
+        });
+    </script>
+</body>
 </html>
