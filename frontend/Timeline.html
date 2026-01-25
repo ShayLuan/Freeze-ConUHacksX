@@ -225,13 +225,17 @@
       margin-bottom: 6px;
     }
 
-    input[type="text"], input[type="date"] {
+    input[type="text"], input[type="date"], input[type="file"] {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid #d7dbe3;
       border-radius: 10px;
       outline: none;
       font-size: 0.95rem;
+    }
+
+    input[type="file"] {
+      cursor: pointer;
     }
 
     .modal-actions {
@@ -307,6 +311,14 @@
         <input id="dateInput" type="date" />
       </div>
 
+      <div class="field">
+        <label for="imageInput">Image (optional)</label>
+        <input id="imageInput" type="file" accept="image/*" />
+        <div id="imagePreview" style="margin-top: 8px; display: none;">
+          <img id="previewImg" src="" alt="Preview" style="max-width: 100%; max-height: 150px; border-radius: 8px; border: 1px solid #ddd;" />
+        </div>
+      </div>
+
       <div class="error" id="errorBox"></div>
 
       <div class="modal-actions">
@@ -344,11 +356,14 @@
       const modalBackdrop = document.getElementById("modalBackdrop");
       const captionInput = document.getElementById("captionInput");
       const dateInput = document.getElementById("dateInput");
+      const imageInput = document.getElementById("imageInput");
+      const imagePreview = document.getElementById("imagePreview");
+      const previewImg = document.getElementById("previewImg");
       const cancelBtn = document.getElementById("cancelBtn");
       const saveBtn = document.getElementById("saveBtn");
       const errorBox = document.getElementById("errorBox");
 
-      if (!scrollArea || !timeline || !addBtn || !modalBackdrop || !captionInput || !dateInput || !cancelBtn || !saveBtn || !errorBox) {
+      if (!scrollArea || !timeline || !addBtn || !modalBackdrop || !captionInput || !dateInput || !imageInput || !cancelBtn || !saveBtn || !errorBox) {
         console.error("Missing required elements.");
         return;
       }
@@ -374,17 +389,45 @@
         if (e.target === modalBackdrop) closeModal();
       });
 
+      // Image preview
+      imageInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            previewImg.src = e.target.result;
+            imagePreview.style.display = "block";
+          };
+          reader.readAsDataURL(file);
+        } else {
+          imagePreview.style.display = "none";
+        }
+      });
+
       // Save
       saveBtn.addEventListener("click", async () => {
         const caption = captionInput.value.trim() || "New Memory";
         const dateISO = dateInput.value;
+        const imageFile = imageInput.files[0];
 
         const v = validateNotFuture(dateISO, todayISO);
         if (!v.ok) return showError(v.msg);
 
         hideError();
-        await addMoment({ caption, dateISO }, { scrollToIt: true, saveToDB: true });
-        closeModal();
+        
+        // Disable save button while uploading
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+
+        try {
+          await addMoment({ caption, dateISO, imageFile }, { scrollToIt: true, saveToDB: true });
+          closeModal();
+        } catch (error) {
+          showError("Failed to save moment. Please try again.");
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        }
       });
 
       // Keyboard controls inside modal
@@ -397,6 +440,8 @@
       function openModal() {
         captionInput.value = "";
         dateInput.value = todayISO;
+        imageInput.value = "";
+        imagePreview.style.display = "none";
         hideError();
         modalBackdrop.style.display = "flex";
         captionInput.focus();
@@ -405,6 +450,9 @@
       function closeModal() {
         modalBackdrop.style.display = "none";
         hideError();
+        // Reset form
+        imageInput.value = "";
+        imagePreview.style.display = "none";
       }
 
       // Load moments from API
@@ -444,35 +492,47 @@
       }
 
       async function addMoment(moment, opts = { scrollToIt: true, saveToDB: true }) {
-        const { caption, dateISO } = moment;
+        const { caption, dateISO, imageFile, moments_url } = moment;
 
         // Final safety check (prevents future moments even programmatically)
         const v = validateNotFuture(dateISO, todayISO);
         if (!v.ok) return showError(v.msg);
 
-        const momentDiv = document.createElement("div");
-        momentDiv.className = "moment";
-        momentDiv.dataset.date = dateISO;
+        let imageUrl = moments_url || null;
 
-        const imageUrl = moment.moments_url || null;
-        const imageContent = imageUrl 
-          ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
-          : '<i>📷</i>';
+        // Upload image to server if provided
+        if (opts.saveToDB && imageFile && currentUser) {
+          try {
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('user_id', currentUser.user_id);
+            formData.append('description', caption);
+            formData.append('date', dateISO);
+            formData.append('reminder', '0');
 
-        momentDiv.innerHTML = `
-          <div class="polaroid">
-            <div class="photo-placeholder" style="background-color:${randomPastel()}">
-              ${imageContent}
-            </div>
-            <div class="caption">${escapeHTML(caption)}</div>
-            <div class="date-badge">${formatDate(dateISO)}</div>
-          </div>
-        `;
-
-        timeline.appendChild(momentDiv);
-
-        // Save to database if this is a new moment
-        if (opts.saveToDB && currentUser) {
+            const response = await fetch(`${API_BASE}/api/moments`, {
+              method: 'POST',
+              body: formData
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+              console.error('Error saving moment:', data.error);
+              showError(data.error || 'Failed to save moment. Please try again.');
+              throw new Error(data.error || 'Failed to save moment');
+            }
+            
+            // Use the URL from the response if available
+            if (data.moment && data.moment.moments_url) {
+              imageUrl = data.moment.moments_url;
+            }
+          } catch (error) {
+            console.error('Error uploading moment:', error);
+            showError('Unable to save moment. Please try again.');
+            throw error;
+          }
+        } else if (opts.saveToDB && currentUser) {
+          // Save without image
           try {
             const response = await fetch(`${API_BASE}/api/moments`, {
               method: 'POST',
@@ -490,14 +550,40 @@
             if (!response.ok) {
               console.error('Error saving moment:', data.error);
               showError(data.error || 'Failed to save moment. Please try again.');
-              return;
+              throw new Error(data.error || 'Failed to save moment');
+            }
+            
+            if (data.moment && data.moment.moments_url) {
+              imageUrl = data.moment.moments_url;
             }
           } catch (error) {
             console.error('Error saving moment to database:', error);
             showError('Unable to save moment. Please try again.');
-            return;
+            throw error;
           }
         }
+
+        // Create the moment display element
+        const momentDiv = document.createElement("div");
+        momentDiv.className = "moment";
+        momentDiv.dataset.date = dateISO;
+
+        const imageContent = imageUrl 
+          ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
+          : '<i>📷</i>';
+
+        momentDiv.innerHTML = `
+          <div class="polaroid">
+            <div class="photo-placeholder" style="background-color:${randomPastel()}">
+              ${imageContent}
+            </div>
+            <div class="caption">${escapeHTML(caption)}</div>
+            <div class="date-badge">${formatDate(dateISO)}</div>
+          </div>
+        `;
+
+        // Insert moment in chronological order (oldest to newest)
+        insertMomentInOrder(momentDiv, dateISO);
 
         adjustTimelineWidth();
 
@@ -523,6 +609,29 @@
       function scrollToMoment(el) {
         const target = el.offsetLeft - (scrollArea.clientWidth / 2) + (el.offsetWidth / 2);
         scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+      }
+
+      // chronological order
+      function insertMomentInOrder(momentDiv, dateISO) {
+        const existingMoments = Array.from(timeline.querySelectorAll('.moment'));
+        
+        // position finder 
+        let insertBefore = null;
+        for (let i = 0; i < existingMoments.length; i++) {
+          const existingDate = existingMoments[i].dataset.date;
+          if (existingDate && dateISO < existingDate) {
+            insertBefore = existingMoments[i];
+            break;
+          }
+        }
+        
+        // Insert at the correct position
+        if (insertBefore) {
+          timeline.insertBefore(momentDiv, insertBefore);
+        } else {
+          // If no earlier moment found, append to end
+          timeline.appendChild(momentDiv);
+        }
       }
 
       function validateNotFuture(dateISO, todayISO) {
