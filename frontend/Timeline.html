@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Freeze Your Memories</title>
+  <title>Memory Timeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet">
 
-  
-  <style>
-  
-
+<style>
   /* ===== Freeze Theme (light, matches homepage) ===== */
   :root{
     --freeze-bg1:#f3f8fe;
@@ -30,19 +30,34 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body{
-  font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, var(--freeze-bg1) 0%, var(--freeze-bg2) 40%, var(--freeze-bg3) 100%);
-  min-height:100vh;
-  padding:20px;
-  overflow-x:hidden;
-  color: #2c3e50; /*  normal default text color */
-}
-
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--freeze-bg1) 0%, var(--freeze-bg2) 40%, var(--freeze-bg3) 100%);
+    min-height:100vh;
+    padding:20px;
+    overflow-x:hidden;
+    color: var(--freeze-text);
+  }
 
   .container{ max-width:1200px; margin:0 auto; }
+  
+  /* Remove max-width constraint for container when it contains timeline */
+  .container:has(.timeline-container){
+    max-width:none;
+    width:100%;
+    padding:0 20px; /* Maintain some side padding */
+  }
 
   header{ text-align:center; margin-bottom:30px; padding-top:20px; }
-  
+
+  h1{
+    font-family: 'Playfair Display', serif;
+    font-size:2.5rem;
+    font-weight:900;
+    color:#8ac6d1;
+    margin-bottom:10px;
+    text-shadow: 0 2px 10px rgba(138, 198, 209, 0.3);
+    letter-spacing: 0.5px;
+  }
 
   .subtitle{
     color:var(--freeze-muted);
@@ -52,11 +67,11 @@
   /* ===== Scroll area (invisible scrollbar) ===== */
   .timeline-container{
     position:relative;
-    height:320px;
+    height:400px;
     margin:30px 0;
     overflow-x:auto;
-    overflow-y:hidden;
-    padding:20px 0;
+    overflow-y:visible;
+    padding:80px 0;
     -webkit-overflow-scrolling:touch;
     touch-action:pan-x;
 
@@ -73,7 +88,8 @@
     height:100%;
     z-index:2;
     min-width:1200px;            /* JS will adjust */
-    padding:0 40px;              /* breathing room at ends */
+    padding:0 300px 0 40px;      /* extra right padding for infinite scroll effect */
+    overflow:visible;            /* Allow shadows to extend beyond */
   }
 
   /* ✅ Rope inside timeline so it never disappears */
@@ -114,7 +130,10 @@
   }
 
   /* When any polaroid is hovered, blur the others ("out of focus") */
-  .timeline:has(.moment:hover) .moment:not(:hover) {
+  .timeline:has(.moment:hover) .moment:not(:hover),
+  .timeline:has(.moment-stack:hover) .moment:not(:hover),
+  .timeline:has(.moment:hover) .moment-stack:not(:hover),
+  .timeline:has(.moment-stack:hover) .moment-stack:not(:hover) {
     filter: blur(3px);
     opacity: 0.85;
     transform: rotate(-2deg) scale(0.95);
@@ -126,6 +145,143 @@
     filter: none;
     opacity: 1;
     z-index:10;
+  }
+
+  /* ===== Stacked Polaroids (same day) ===== */
+  .moment-stack{
+    position:relative;
+    margin:0 40px;
+    transform:rotate(-2deg);
+    transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease, opacity 0.35s ease;
+    cursor:pointer;
+    z-index:3;
+    flex:0 0 auto;
+  }
+
+  .moment-stack:hover{
+    transform: rotate(2deg) scale(1.2);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.22);
+    filter: none;
+    opacity: 1;
+    z-index:10;
+  }
+
+  .stack-container{
+    position:relative;
+    width:180px;
+    height:220px;
+  }
+
+  /* Delete pin for stacks - just the polaroid on top */
+  .stack-container .delete-pin{
+    position:absolute;
+    top:-15px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:25;
+  }
+
+  .stack-polaroid{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    background: var(--freeze-card);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding:15px;
+    border-radius:10px;
+    border:1px solid var(--freeze-border);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(255,255,255,0.55);
+    text-align:center;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+    transform-origin: center center;
+  }
+
+  /* Visible corners for stacked polaroids - show all layers with slight offsets */
+  .stack-polaroid:nth-child(1){
+    transform: rotate(-4deg) translateY(-3px);
+    z-index:5;
+  }
+  .stack-polaroid:nth-child(2){
+    transform: rotate(3deg) translateY(3px);
+    z-index:4;
+  }
+  .stack-polaroid:nth-child(3){
+    transform: rotate(-2deg) translateY(6px);
+    z-index:3;
+  }
+  .stack-polaroid:nth-child(4){
+    transform: rotate(2deg) translateY(9px);
+    z-index:2;
+  }
+  .stack-polaroid:nth-child(n+5){
+    transform: rotate(-1deg) translateY(12px);
+    z-index:1;
+  }
+
+  /* Active polaroid is fully visible, centered, and on top */
+  .stack-polaroid.stack-active{
+    opacity:1 !important;
+    transform: rotate(0deg) translateY(0) scale(1) !important;
+    z-index:15 !important;
+    pointer-events:auto;
+  }
+
+  /* Non-active polaroids: corners visible but slightly dimmed */
+  .stack-polaroid:not(.stack-active){
+    opacity:0.6;
+    pointer-events:none;
+  }
+
+  .stack-nav{
+    position:absolute;
+    bottom:-30px;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    gap:8px;
+    align-items:center;
+    z-index:15;
+  }
+
+  .stack-dot{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background: var(--freeze-muted);
+    opacity:0.4;
+    cursor:pointer;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .stack-dot.active{
+    opacity:1;
+    transform:scale(1.3);
+    background: var(--freeze-primary);
+  }
+
+  .stack-dot:hover{
+    opacity:0.7;
+  }
+
+  .stack-container .stack-badge{
+    position:absolute;
+    top:-8px;
+    right:-8px;
+    background: var(--freeze-primary);
+    color:white;
+    border-radius:50%;
+    width:24px;
+    height:24px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:0.75rem;
+    font-weight:bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index:20;
+    pointer-events:none;
   }
 
   .polaroid{
@@ -146,8 +302,8 @@
     position:relative;
   }
 
-  .polaroid::before{
-    content:"";
+  /* Delete pin button */
+  .delete-pin{
     position:absolute;
     top:-15px;
     left:50%;
@@ -157,6 +313,43 @@
     background:#e74c3c;
     border-radius:50%;
     box-shadow: 0 0 10px rgba(231,76,60,0.45);
+    border:none;
+    cursor:pointer;
+    z-index:20;
+    transition: transform 0.2s ease, width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .delete-pin:hover{
+    transform:translateX(-50%) scale(1.3);
+    box-shadow: 0 0 15px rgba(231,76,60,0.6);
+  }
+
+  .delete-pin:active{
+    transform:translateX(-50%) scale(1.1);
+  }
+
+    /* delete animation*/
+  .delete-pin.unpinning{
+    animation: unpin 0.5s ease-out forwards;
+  }
+
+  @keyframes unpin {
+    0% {
+      transform: translateX(-50%) translateY(0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translateX(-50%) translateY(-30px) scale(0.8);
+      opacity: 0.7;
+    }
+    100% {
+      transform: translateX(-50%) translateY(-60px) scale(0.3);
+      opacity: 0;
+    }
   }
 
   .photo-placeholder{
@@ -342,15 +535,12 @@
     .polaroid{ width:150px; }
   }
 </style>
-
 </head>
 
 <body>
   <div class="container">
     <header>
-      <h1>Freeze Your Memories</h1>
-      <p class="subtitle">Scroll horizontally to explore your moments</p>
-      
+      <h1>Memory Timeline</h1>
     </header>
 
     <div class="timeline-container" id="timelineScroll">
@@ -438,6 +628,51 @@
         console.error("Missing required elements.");
         return;
       }
+
+      // ===== Drag to scroll functionality =====
+      let isDragging = false;
+      let startX = 0;
+      let scrollLeft = 0;
+
+      scrollArea.addEventListener('mousedown', (e) => {
+        // Don't start dragging if clicking on interactive elements (polaroids, buttons, etc.)
+        if (e.target.closest('.moment, .moment-stack, .stack-nav, .stack-dot, button, a')) {
+          return;
+        }
+        
+        isDragging = true;
+        scrollArea.style.cursor = 'grabbing';
+        scrollArea.style.userSelect = 'none';
+        
+        startX = e.pageX - scrollArea.offsetLeft;
+        scrollLeft = scrollArea.scrollLeft;
+        
+        e.preventDefault();
+      });
+
+      scrollArea.addEventListener('mouseleave', () => {
+        isDragging = false;
+        scrollArea.style.cursor = 'grab';
+        scrollArea.style.userSelect = '';
+      });
+
+      scrollArea.addEventListener('mouseup', () => {
+        isDragging = false;
+        scrollArea.style.cursor = 'grab';
+        scrollArea.style.userSelect = '';
+      });
+
+      scrollArea.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        const x = e.pageX - scrollArea.offsetLeft;
+        const walk = (x - startX) * 2; // Multiply by 2 for faster scrolling
+        scrollArea.scrollLeft = scrollLeft - walk;
+      });
+
+      // Set initial cursor style
+      scrollArea.style.cursor = 'grab';
 
       // ✅ Today's date (local) in YYYY-MM-DD
       const todayISO = toISODate(new Date());
@@ -547,22 +782,32 @@
           // Clear existing moments
           timeline.innerHTML = '<div class="timeline-rope"></div>';
           
-          // Add moments from database
+          // Group moments by date
           if (data.moments && data.moments.length > 0) {
-            data.moments.forEach(moment => {
+            const groupedByDate = groupMomentsByDate(data.moments);
+            
+            // Sort dates (newest first)
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+            
+            // Render each date group
+            sortedDates.forEach(dateISO => {
+              const momentsForDate = groupedByDate[dateISO];
               try {
-                addMomentToTimeline(moment, { scrollToIt: false, saveToDB: false });
+                if (momentsForDate.length === 1) {
+                  // Single moment - render normally
+                  addMomentToTimeline(momentsForDate[0], { scrollToIt: false, saveToDB: false });
+                } else {
+                  // Multiple moments - render as stack
+                  renderMomentStack(dateISO, momentsForDate);
+                }
               } catch (err) {
-                console.error('Error adding moment to timeline:', err, moment);
+                console.error('Error adding moment group to timeline:', err, momentsForDate);
               }
             });
           } else {
             // Show message if no moments
             const emptyMsg = document.createElement('div');
-            emptyMsg.style.textAlign = 'center';
-            emptyMsg.style.color = '#7f8c8d';
-            emptyMsg.style.padding = '40px';
-            emptyMsg.style.width = '100%';
+            emptyMsg.className = 'empty-msg';
             emptyMsg.textContent = 'No moments yet. Click the + button to add your first moment!';
             timeline.appendChild(emptyMsg);
           }
@@ -574,8 +819,150 @@
         }
       }
 
+      // Group moments by date (YYYY-MM-DD)
+      function groupMomentsByDate(moments) {
+        const grouped = {};
+        moments.forEach(moment => {
+          let dateISO = moment.date;
+          if (!dateISO && moment.created_at) {
+            dateISO = moment.created_at.split('T')[0];
+          }
+          if (!dateISO) {
+            dateISO = toISODate(new Date());
+          }
+          // Normalize to YYYY-MM-DD
+          if (typeof dateISO === "string" && dateISO.includes("T")) {
+            dateISO = dateISO.split("T")[0];
+          }
+          dateISO = String(dateISO).trim();
+          
+          if (!grouped[dateISO]) {
+            grouped[dateISO] = [];
+          }
+          grouped[dateISO].push(moment);
+        });
+        return grouped;
+      }
+
+      // Render a stack of polaroids for the same date
+      function renderMomentStack(dateISO, moments) {
+        const stackDiv = document.createElement("div");
+        stackDiv.className = "moment-stack";
+        stackDiv.dataset.date = dateISO;
+        
+        const stackContainer = document.createElement("div");
+        stackContainer.className = "stack-container";
+        
+        // Add badge showing number of photos in stack
+        if (moments.length > 1) {
+          const badge = document.createElement("div");
+          badge.className = "stack-badge";
+          badge.textContent = moments.length;
+          stackContainer.appendChild(badge);
+        }
+        
+        let currentIndex = 0;
+        
+        // Store moments_id for each moment in the stack
+        const momentsIds = moments.map(m => m.moments_id);
+        stackContainer.dataset.momentsIds = JSON.stringify(momentsIds);
+        
+        // Create polaroids for each moment in the stack
+        moments.forEach((momentData, index) => {
+          const caption = momentData.description || momentData.caption || 'Untitled Moment';
+          const imageUrl = momentData.moments_url || null;
+          
+          const polaroidDiv = document.createElement("div");
+          polaroidDiv.className = `stack-polaroid ${index === 0 ? 'stack-active' : ''}`;
+          polaroidDiv.dataset.momentIndex = index;
+          polaroidDiv.dataset.momentsId = momentData.moments_id;
+          
+          const imageContent = imageUrl 
+            ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
+            : '<i>📷</i>';
+          
+          polaroidDiv.innerHTML = `
+            <div class="photo-placeholder" style="background-color:${randomPastel()}">
+              ${imageContent}
+            </div>
+            <div class="caption">${escapeHTML(caption)}</div>
+            <div class="date-badge">${formatDate(dateISO)}</div>
+          `;
+          
+          stackContainer.appendChild(polaroidDiv);
+        });
+        
+        // delet button for the stack
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-pin";
+        deleteBtn.setAttribute("aria-label", "Delete moment");
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const activePolaroid = stackContainer.querySelector('.stack-polaroid.stack-active');
+          if (activePolaroid) {
+            const momentsId = activePolaroid.dataset.momentsId;
+            handleDeleteMoment(momentsId, stackDiv);
+          }
+        });
+        stackContainer.appendChild(deleteBtn);
+        
+        // Add navigation dots if more than 1 moment
+        if (moments.length > 1) {
+          const navDiv = document.createElement("div");
+          navDiv.className = "stack-nav";
+          
+          moments.forEach((_, index) => {
+            const dot = document.createElement("div");
+            dot.className = `stack-dot ${index === 0 ? 'active' : ''}`;
+            dot.dataset.index = index;
+            dot.addEventListener('click', (e) => {
+              e.stopPropagation();
+              flipToIndex(stackContainer, index);
+              // Update active dot
+              navDiv.querySelectorAll('.stack-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === index);
+              });
+            });
+            navDiv.appendChild(dot);
+          });
+          
+          stackContainer.appendChild(navDiv);
+          
+          // Add click handler to flip through stack
+          stackContainer.addEventListener('click', (e) => {
+            // Don't flip if clicking on delete button or navigation
+            if (e.target.closest('.delete-pin') || e.target.closest('.stack-nav')) {
+              return;
+            }
+            currentIndex = (currentIndex + 1) % moments.length;
+            flipToIndex(stackContainer, currentIndex);
+            // Update active dot
+            navDiv.querySelectorAll('.stack-dot').forEach((d, i) => {
+              d.classList.toggle('active', i === currentIndex);
+            });
+          });
+        }
+        
+        stackDiv.appendChild(stackContainer);
+        
+        // Insert in reverse chronological order
+        insertMomentInOrder(stackDiv, dateISO);
+      }
+
+      // Flip animation to show a specific polaroid in the stack
+      function flipToIndex(stackContainer, targetIndex) {
+        const polaroids = stackContainer.querySelectorAll('.stack-polaroid');
+        polaroids.forEach((polaroid, index) => {
+          if (index === targetIndex) {
+            polaroid.classList.add('stack-active');
+          } else {
+            polaroid.classList.remove('stack-active');
+          }
+        });
+      }
+
       async function addMoment(moment, opts = { scrollToIt: true, saveToDB: true }) {
-        const { caption, dateISO, imageFile, moments_url } = moment;
+        const { caption, dateISO, imageFile, moments_url, moments_id } = moment;
 
         // Final safety check (prevents future moments even programmatically)
         const v = validateNotFuture(dateISO, todayISO);
@@ -650,6 +1037,9 @@
         const momentDiv = document.createElement("div");
         momentDiv.className = "moment";
         momentDiv.dataset.date = dateISO;
+        if (moments_id) {
+          momentDiv.dataset.momentsId = moments_id;
+        }
 
         const imageContent = imageUrl 
           ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
@@ -657,6 +1047,7 @@
 
         momentDiv.innerHTML = `
           <div class="polaroid">
+            ${moments_id ? `<button class="delete-pin" data-moments-id="${moments_id}" aria-label="Delete moment"></button>` : ''}
             <div class="photo-placeholder" style="background-color:${randomPastel()}">
               ${imageContent}
             </div>
@@ -665,8 +1056,15 @@
           </div>
         `;
 
-        // Insert moment in chronological order (oldest to newest)
-        insertMomentInOrder(momentDiv, dateISO);
+        // Add delete button click handler if moments_id exists
+        if (moments_id) {
+          const deleteBtn = momentDiv.querySelector('.delete-pin');
+          deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleDeleteMoment(moments_id, momentDiv);
+          });
+        }
+
         // Insert moment in chronological order (oldest to newest)
         insertMomentInOrder(momentDiv, dateISO);
 
@@ -694,13 +1092,59 @@
         }
         dateISO = String(dateISO).trim();
 
-        // Pass moments_url (can be empty string, which is valid)
-        addMoment({ caption, dateISO, moments_url: momentData.moments_url }, opts);
+        // Pass moments_url (can be empty string, which is valid) and moments_id
+        addMoment({ 
+          caption, 
+          dateISO, 
+          moments_url: momentData.moments_url,
+          moments_id: momentData.moments_id 
+        }, opts);
+      }
+
+      // Handle delete moment with confirmation and animation
+      async function handleDeleteMoment(momentsId, momentElement) {
+        // Find the delete button
+        const deleteBtn = momentElement.querySelector('.delete-pin');
+        if (!deleteBtn) return;
+
+        // Confirm deletion
+        const confirmed = confirm('Are you sure you want to delete this moment? This action cannot be undone.');
+        if (!confirmed) return;
+
+        // Add unpin animation
+        deleteBtn.classList.add('unpinning');
+        
+        // Wait for animation to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+          // Call DELETE API
+          const response = await fetch(`${API_BASE}/api/moments/${momentsId}?user_id=${currentUser.user_id}`, {
+            method: 'DELETE'
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error deleting moment:', data.error);
+            showError(data.error || 'Failed to delete moment. Please try again.');
+            deleteBtn.classList.remove('unpinning');
+            return;
+          }
+
+          // Reload moments from database to update timeline
+          await loadUserMoments();
+        } catch (error) {
+          console.error('Error deleting moment:', error);
+          showError('Unable to delete moment. Please try again.');
+          deleteBtn.classList.remove('unpinning');
+        }
       }
 
       function adjustTimelineWidth() {
-        // include rope padding; each moment is ~180 + 80 margins => ~260
-        const count = timeline.querySelectorAll(".moment").length;
+        // include rope padding; each moment/stack is ~180 + 80 margins => ~260
+        // if padding doesn't fix this, i don't know what will
+        const count = timeline.querySelectorAll(".moment, .moment-stack").length;
         timeline.style.minWidth = `${Math.max(1200, count * 260)}px`;
       }
 
@@ -709,15 +1153,14 @@
         scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
       }
 
-      // chronological order
+      // Insert in reverse chronological order (newest first)
       function insertMomentInOrder(momentDiv, dateISO) {
-        const existingMoments = Array.from(timeline.querySelectorAll('.moment'));
+        const existingMoments = Array.from(timeline.querySelectorAll('.moment, .moment-stack'));
         
-        // position finder 
         let insertBefore = null;
         for (let i = 0; i < existingMoments.length; i++) {
           const existingDate = existingMoments[i].dataset.date;
-          if (existingDate && dateISO < existingDate) {
+          if (existingDate && dateISO > existingDate) {
             insertBefore = existingMoments[i];
             break;
           }
@@ -727,7 +1170,6 @@
         if (insertBefore) {
           timeline.insertBefore(momentDiv, insertBefore);
         } else {
-          // If no earlier moment found, append to end
           timeline.appendChild(momentDiv);
         }
       }
