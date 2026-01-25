@@ -490,7 +490,6 @@
   <div class="container">
     <header>
       <h1>Memory Timeline</h1>
-      <p class="subtitle">Scroll horizontally to explore your moments</p>
     </header>
 
     <div class="timeline-container" id="timelineScroll">
@@ -578,6 +577,51 @@
         console.error("Missing required elements.");
         return;
       }
+
+      // ===== Drag to scroll functionality =====
+      let isDragging = false;
+      let startX = 0;
+      let scrollLeft = 0;
+
+      scrollArea.addEventListener('mousedown', (e) => {
+        // Don't start dragging if clicking on interactive elements (polaroids, buttons, etc.)
+        if (e.target.closest('.moment, .moment-stack, .stack-nav, .stack-dot, button, a')) {
+          return;
+        }
+        
+        isDragging = true;
+        scrollArea.style.cursor = 'grabbing';
+        scrollArea.style.userSelect = 'none';
+        
+        startX = e.pageX - scrollArea.offsetLeft;
+        scrollLeft = scrollArea.scrollLeft;
+        
+        e.preventDefault();
+      });
+
+      scrollArea.addEventListener('mouseleave', () => {
+        isDragging = false;
+        scrollArea.style.cursor = 'grab';
+        scrollArea.style.userSelect = '';
+      });
+
+      scrollArea.addEventListener('mouseup', () => {
+        isDragging = false;
+        scrollArea.style.cursor = 'grab';
+        scrollArea.style.userSelect = '';
+      });
+
+      scrollArea.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        const x = e.pageX - scrollArea.offsetLeft;
+        const walk = (x - startX) * 2; // Multiply by 2 for faster scrolling
+        scrollArea.scrollLeft = scrollLeft - walk;
+      });
+
+      // Set initial cursor style
+      scrollArea.style.cursor = 'grab';
 
       // ✅ Today's date (local) in YYYY-MM-DD
       const todayISO = toISODate(new Date());
