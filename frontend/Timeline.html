@@ -110,15 +110,24 @@
     position:relative;
     margin:0 40px;
     transform:rotate(-2deg);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease, opacity 0.35s ease;
     cursor:pointer;
     z-index:3;
     flex:0 0 auto;
   }
 
+  /* When any polaroid is hovered, blur the others ("out of focus") */
+  .timeline:has(.moment:hover) .moment:not(:hover) {
+    filter: blur(3px);
+    opacity: 0.85;
+    transform: rotate(-2deg) scale(0.95);
+  }
+
   .moment:hover{
-    transform: rotate(2deg) scale(1.05);
-    box-shadow: 0 14px 28px rgba(0,0,0,0.14);
+    transform: rotate(2deg) scale(1.2);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.22);
+    filter: none;
+    opacity: 1;
     z-index:10;
   }
 
