@@ -5,281 +5,337 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Memory Timeline</title>
 
-  <style>
-    /* ===== Reset / basics ===== */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+<style>
+  /* ===== Freeze Theme (light, matches homepage) ===== */
+  :root{
+    --freeze-bg1:#f3f8fe;
+    --freeze-bg2:#e6f0fa;
+    --freeze-bg3:#dde9f7;
 
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      min-height: 100vh;
-      padding: 20px;
-      overflow-x: hidden;
-    }
+    --freeze-card: rgba(255,255,255,0.92);
+    --freeze-border: rgba(123,184,255,0.25);
 
-    .container { max-width: 1200px; margin: 0 auto; }
+    --freeze-primary:#7bb8ff;
+    --freeze-secondary:#b7dcff;
+    --freeze-accent:#4a90e2;
 
-    header { text-align: center; margin-bottom: 30px; padding-top: 20px; }
-    h1 {
-      font-size: 2.5rem;
-      color: #2c3e50;
-      margin-bottom: 10px;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
-    }
-    .subtitle { color: #7f8c8d; font-size: 1.1rem; }
+    --freeze-text:#2c3e50;
+    --freeze-muted:#7f9db5;
+  }
 
-    /* ===== Scroll area (invisible scrollbar) ===== */
-    .timeline-container {
-      position: relative;
-      height: 320px;
-      margin: 30px 0;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 20px 0;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-x;
+  /* ===== Reset / basics ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-      scrollbar-width: none;        /* Firefox */
-      -ms-overflow-style: none;     /* old Edge/IE */
-    }
-    .timeline-container::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
+  body{
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--freeze-bg1) 0%, var(--freeze-bg2) 40%, var(--freeze-bg3) 100%);
+    min-height:100vh;
+    padding:20px;
+    overflow-x:hidden;
+    color: var(--freeze-text);
+  }
 
-    /* ===== Timeline content ===== */
-    .timeline {
-      position: relative;           /* anchor rope */
-      display: flex;
-      align-items: center;
-      height: 100%;
-      z-index: 2;
-      min-width: 1200px;            /* JS will adjust */
-      padding: 0 40px;              /* breathing room at ends */
-    }
+  .container{ max-width:1200px; margin:0 auto; }
 
-    /* ✅ Rope lives INSIDE .timeline so it never disappears */
-    .timeline-rope {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      width: 100%;
-      height: 8px;
-      transform: translateY(-50%);
-      border-radius: 999px;
+  header{ text-align:center; margin-bottom:30px; padding-top:20px; }
 
-      /* 🌊 Gradient blue rope */
-      background: linear-gradient(
-        90deg,
-        #d7efff 0%,
-        #9dd0ff 25%,
-        #4a90e2 50%,
-        #9dd0ff 75%,
-        #d7efff 100%
-      );
+  h1{
+    font-size:2.5rem;
+    color:var(--freeze-text);
+    margin-bottom:10px;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.08);
+    letter-spacing: 0.5px;
+  }
 
-      box-shadow:
-        0 6px 14px rgba(0, 90, 170, 0.18),
-        inset 0 1px 4px rgba(255,255,255,0.7);
+  .subtitle{
+    color:var(--freeze-muted);
+    font-size:1.1rem;
+  }
 
-      z-index: 1;
-    }
+  /* ===== Scroll area (invisible scrollbar) ===== */
+  .timeline-container{
+    position:relative;
+    height:320px;
+    margin:30px 0;
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding:20px 0;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
 
-    /* ===== Polaroids ===== */
-    .moment {
-      position: relative;
-      margin: 0 40px;
-      transform: rotate(-2deg);
-      transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease, opacity 0.35s ease;
-      cursor: pointer;
-      z-index: 3; /* above the rope */
-      flex: 0 0 auto;
-    }
-    /* When any polaroid is hovered, blur the others ("out of focus") */
-    .timeline:has(.moment:hover) .moment:not(:hover) {
-      filter: blur(6px);
-      opacity: 0.6;
-    }
-    .moment:hover {
-      transform: rotate(2deg) scale(1.2);
-      box-shadow: 0 14px 32px rgba(0,0,0,0.22);
-      filter: none;
-      opacity: 1;
-      z-index: 10;
-    }
+    scrollbar-width:none;        /* Firefox */
+    -ms-overflow-style:none;     /* old Edge/IE */
+  }
+  .timeline-container::-webkit-scrollbar{ display:none; } /* Chrome/Safari/Edge */
 
-    .polaroid {
-      background: white;
-      padding: 15px;
-      width: 180px;
-      border-radius: 6px;
-      border: 1px solid #eee;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.14);
-      text-align: center;
-      position: relative;
-    }
+  /* ===== Timeline content ===== */
+  .timeline{
+    position:relative;           /* anchor rope */
+    display:flex;
+    align-items:center;
+    height:100%;
+    z-index:2;
+    min-width:1200px;            /* JS will adjust */
+    padding:0 40px;              /* breathing room at ends */
+  }
 
-    .polaroid::before {
-      content: "";
-      position: absolute;
-      top: -15px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 20px;
-      height: 20px;
-      background: #e74c3c;
-      border-radius: 50%;
-      box-shadow: 0 0 10px rgba(231,76,60,0.5);
-    }
+  /* ✅ Rope inside timeline so it never disappears */
+  .timeline-rope{
+    position:absolute;
+    top:50%;
+    left:0;
+    width:100%;
+    height:8px;
+    transform:translateY(-50%);
+    border-radius:999px;
 
-    .photo-placeholder {
-      width: 100%;
-      height: 140px;
-      border-radius: 4px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(0,0,0,0.10);
-      overflow: hidden;
-    }
-    .photo-placeholder img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .photo-placeholder i {
-      color: rgba(0,0,0,0.30);
-      font-size: 2rem;
-    }
+    background: linear-gradient(
+      90deg,
+      #eaf4ff 0%,
+      var(--freeze-secondary) 30%,
+      var(--freeze-primary) 50%,
+      var(--freeze-secondary) 70%,
+      #eaf4ff 100%
+    );
 
-    .caption {
-      font-size: 0.9rem;
-      color: #7f8c8d;
-      font-style: italic;
-      min-height: 20px;
-    }
+    box-shadow:
+      0 4px 12px rgba(123,184,255,0.35),
+      inset 0 1px 4px rgba(255,255,255,0.85);
 
-    .date-badge {
-      margin-top: 6px;
-      font-size: 0.8rem;
-      color: #2c3e50;
-      opacity: 0.8;
-    }
+    z-index:1;
+  }
 
-    .instructions {
-      text-align: center;
-      color: #7f8c8d;
-      margin-top: 8px;
-      font-size: 0.95rem;
-    }
+  /* ===== Polaroids ===== */
+  .moment{
+    position:relative;
+    margin:0 40px;
+    transform:rotate(-2deg);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    cursor:pointer;
+    z-index:3;
+    flex:0 0 auto;
+  }
 
-    /* ===== Floating add button ===== */
-    .add-moment-btn {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #3498db, #2ecc71);
-      color: white;
-      border: none;
-      font-size: 2rem;
-      cursor: pointer;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.20);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
-    }
-    .add-moment-btn:hover {
-      transform: scale(1.1) rotate(90deg);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
-    }
+  .moment:hover{
+    transform: rotate(2deg) scale(1.05);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.14);
+    z-index:10;
+  }
 
-    /* ===== Modal ===== */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.35);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    }
+  .polaroid{
+    background: var(--freeze-card);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 
-    .modal {
-      width: 100%;
-      max-width: 420px;
-      background: #fff;
-      border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-    }
+    padding:15px;
+    width:180px;
+    border-radius:10px;
+    border:1px solid var(--freeze-border);
 
-    .modal h2 {
-      font-size: 1.2rem;
-      color: #2c3e50;
-      margin-bottom: 12px;
-    }
+    box-shadow:
+      0 10px 25px rgba(0,0,0,0.12),
+      inset 0 0 0 1px rgba(255,255,255,0.55);
 
-    .field { margin-bottom: 12px; }
+    text-align:center;
+    position:relative;
+  }
 
-    label {
-      display: block;
-      font-size: 0.9rem;
-      color: #2c3e50;
-      margin-bottom: 6px;
-    }
+  .polaroid::before{
+    content:"";
+    position:absolute;
+    top:-15px;
+    left:50%;
+    transform:translateX(-50%);
+    width:20px;
+    height:20px;
+    background:#e74c3c;
+    border-radius:50%;
+    box-shadow: 0 0 10px rgba(231,76,60,0.45);
+  }
 
-    input[type="text"], input[type="date"], input[type="file"] {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d7dbe3;
-      border-radius: 10px;
-      outline: none;
-      font-size: 0.95rem;
-    }
+  .photo-placeholder{
+    width:100%;
+    height:140px;
+    border-radius:8px;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid rgba(123,184,255,0.35);
+    overflow:hidden;
 
-    input[type="file"] {
-      cursor: pointer;
-    }
+    background: linear-gradient(135deg, #eaf4ff, #d6ebff);
+  }
 
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      margin-top: 10px;
-    }
+  .photo-placeholder img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
 
-    .btn {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 12px;
-      cursor: pointer;
-      font-weight: 700;
-    }
+  .photo-placeholder i{
+    color: rgba(44,62,80,0.35);
+    font-size:2rem;
+  }
 
-    .btn.cancel { background: #ecf0f1; color: #2c3e50; }
-    .btn.save { background: #2ecc71; color: #fff; }
+  .caption{
+    font-size:0.9rem;
+    color: var(--freeze-muted);
+    font-style: italic;
+    min-height:20px;
+  }
 
-    .error {
-      display: none;
-      margin-top: 8px;
-      font-size: 0.9rem;
-      color: #c0392b;
-      background: rgba(192,57,43,0.08);
-      border: 1px solid rgba(192,57,43,0.25);
-      padding: 8px 10px;
-      border-radius: 10px;
-    }
+  .date-badge{
+    margin-top:6px;
+    font-size:0.8rem;
+    color: var(--freeze-text);
+    opacity:0.75;
+  }
 
-    @media (max-width: 768px) {
-      h1 { font-size: 2rem; }
-      .moment { margin: 0 30px; }
-      .polaroid { width: 150px; }
-    }
-  </style>
+  .instructions{
+    text-align:center;
+    color: var(--freeze-muted);
+    margin-top:8px;
+    font-size:0.95rem;
+  }
+
+  /* ===== Empty message ===== */
+  .empty-msg{
+    width:100%;
+    text-align:center;
+    color: var(--freeze-muted);
+    padding:40px;
+    z-index:3;
+  }
+
+  /* ===== Floating add button ===== */
+  .add-moment-btn{
+    position:fixed;
+    bottom:30px;
+    right:30px;
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    background: linear-gradient(135deg, var(--freeze-primary), var(--freeze-accent));
+    color:white;
+    border:none;
+    font-size:2rem;
+    cursor:pointer;
+
+    box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  }
+
+  .add-moment-btn:hover{
+    transform: scale(1.08) rotate(90deg);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.22);
+    filter: brightness(1.03);
+  }
+
+  /* ===== Modal ===== */
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    background: rgba(10,20,30,0.35);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:20px;
+  }
+
+  .modal{
+    width:100%;
+    max-width:420px;
+    background: rgba(255,255,255,0.94);
+    border-radius:16px;
+    padding:16px;
+    border: 1px solid rgba(123,184,255,0.25);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+
+    box-shadow: 0 25px 60px rgba(0,0,0,0.22);
+  }
+
+  .modal h2{
+    font-size:1.2rem;
+    color: var(--freeze-text);
+    margin-bottom:12px;
+  }
+
+  .field{ margin-bottom:12px; }
+
+  label{
+    display:block;
+    font-size:0.9rem;
+    color: var(--freeze-text);
+    margin-bottom:6px;
+    opacity:0.9;
+  }
+
+  input[type="text"], input[type="date"], input[type="url"]{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid rgba(123,184,255,0.35);
+    border-radius:12px;
+    outline:none;
+    font-size:0.95rem;
+    background: rgba(255,255,255,0.9);
+    color: var(--freeze-text);
+  }
+
+  input[type="text"]:focus, input[type="date"]:focus, input[type="url"]:focus{
+    border-color: rgba(74,144,226,0.7);
+    box-shadow: 0 0 0 3px rgba(123,184,255,0.25);
+  }
+
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+    margin-top:10px;
+  }
+
+  .btn{
+    border:none;
+    border-radius:12px;
+    padding:10px 12px;
+    cursor:pointer;
+    font-weight:700;
+  }
+
+  .btn.cancel{
+    background: rgba(236,240,241,0.95);
+    color: var(--freeze-text);
+  }
+
+  .btn.save{
+    background: linear-gradient(135deg, var(--freeze-primary), var(--freeze-accent));
+    color: #fff;
+  }
+
+  .error{
+    display:none;
+    margin-top:8px;
+    font-size:0.9rem;
+    color:#c0392b;
+    background: rgba(192,57,43,0.08);
+    border:1px solid rgba(192,57,43,0.25);
+    padding:8px 10px;
+    border-radius:12px;
+  }
+
+  @media (max-width: 768px){
+    h1{ font-size:2rem; }
+    .moment{ margin:0 30px; }
+    .polaroid{ width:150px; }
+  }
+</style>
 </head>
 
 <body>
