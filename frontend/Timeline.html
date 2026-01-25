@@ -987,8 +987,6 @@
 
         // Insert moment in chronological order (oldest to newest)
         insertMomentInOrder(momentDiv, dateISO);
-        // Insert moment in chronological order (oldest to newest)
-        insertMomentInOrder(momentDiv, dateISO);
 
         adjustTimelineWidth();
 
@@ -1030,15 +1028,14 @@
         scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
       }
 
-      // chronological order
+      // Insert in reverse chronological order (newest first)
       function insertMomentInOrder(momentDiv, dateISO) {
         const existingMoments = Array.from(timeline.querySelectorAll('.moment, .moment-stack'));
         
-        // position finder 
         let insertBefore = null;
         for (let i = 0; i < existingMoments.length; i++) {
           const existingDate = existingMoments[i].dataset.date;
-          if (existingDate && dateISO < existingDate) {
+          if (existingDate && dateISO > existingDate) {
             insertBefore = existingMoments[i];
             break;
           }
@@ -1048,7 +1045,6 @@
         if (insertBefore) {
           timeline.insertBefore(momentDiv, insertBefore);
         } else {
-          // If no earlier moment found, append to end
           timeline.appendChild(momentDiv);
         }
       }
