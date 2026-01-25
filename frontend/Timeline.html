@@ -582,7 +582,8 @@
           </div>
         `;
 
-        timeline.appendChild(momentDiv);
+        // Insert moment in chronological order (oldest to newest)
+        insertMomentInOrder(momentDiv, dateISO);
 
         adjustTimelineWidth();
 
@@ -608,6 +609,29 @@
       function scrollToMoment(el) {
         const target = el.offsetLeft - (scrollArea.clientWidth / 2) + (el.offsetWidth / 2);
         scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+      }
+
+      // chronological order
+      function insertMomentInOrder(momentDiv, dateISO) {
+        const existingMoments = Array.from(timeline.querySelectorAll('.moment'));
+        
+        // position finder 
+        let insertBefore = null;
+        for (let i = 0; i < existingMoments.length; i++) {
+          const existingDate = existingMoments[i].dataset.date;
+          if (existingDate && dateISO < existingDate) {
+            insertBefore = existingMoments[i];
+            break;
+          }
+        }
+        
+        // Insert at the correct position
+        if (insertBefore) {
+          timeline.insertBefore(momentDiv, insertBefore);
+        } else {
+          // If no earlier moment found, append to end
+          timeline.appendChild(momentDiv);
+        }
       }
 
       function validateNotFuture(dateISO, todayISO) {
