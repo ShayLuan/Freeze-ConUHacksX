@@ -1,82 +1,102 @@
 const express = require("express");
-const router = express.Router();
 const bcrypt = require("bcrypt");
-const pool = require("../db");
-const sendEmail = require("../utils/email");
+const router = express.Router();
 
-// REGISTER
-router.post("/register", async (req, res) => {
+// Register/Signup endpoint
+router.post("/signup", async (req, res) => {
   try {
+    const db = req.app.locals.db;
     const { username, email, password } = req.body;
 
-    // 1️⃣ Check if email already exists
-    const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (existing.length > 0) {
-      return res.status(400).json({ message: "Email already registered" });
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // 2️⃣ Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 3️⃣ Save user to DB
-    await pool.query(
-      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-      [username, email, hashedPassword]
+    // Check if email already exists
+    const [emailExists] = await db.query(
+      "SELECT user_id FROM User WHERE email = ?",
+      [email]
     );
 
-    // 4️⃣ Send welcome email
-    await sendEmail({
-      to: email,
-      subject: "Welcome to Our App 🎉",
-      html: `
-        <h2>Welcome, ${username}!</h2>
-        <p>Your account has been successfully created.</p>
-        <p>Thanks for joining us 🚀</p>
-      `
+    if (emailExists.length > 0) {
+      return res.status(409).json({ error: "Email already registered" });
+    }
+
+    // Check if username already exists (if provided)
+    if (username) {
+      const [usernameExists] = await db.query(
+        "SELECT user_id FROM User WHERE username = ?",
+        [username]
+      );
+
+      if (usernameExists.length > 0) {
+        return res.status(409).json({ error: "Username already taken" });
+      }
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insert new user
+    const [result] = await db.query(
+      "INSERT INTO User (username, email, password) VALUES (?, ?, ?)",
+      [username || null, email, hashedPassword]
+    );
+
+    res.status(201).json({
+      message: "User registered successfully",
+      user_id: result.insertId,
     });
-
-    res.status(201).json({ message: "User registered successfully" });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Registration failed" });
+    console.error("Registration error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// LOGIN
+// Login endpoint
 router.post("/login", async (req, res) => {
   try {
+    const db = req.app.locals.db;
     const { email, password } = req.body;
 
-    // 1️⃣ Find user
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (rows.length === 0) {
-      return res.status(400).json({ message: "Invalid email or password" });
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const user = rows[0];
+    // Find user by email
+    const [User] = await db.query(
+      "SELECT user_id, username, email, password FROM User WHERE email = ?",
+      [email]
+    );
 
-    // 2️⃣ Compare password
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(400).json({ message: "Invalid email or password" });
+    if (User.length === 0) {
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // 3️⃣ Optional: send login email
-    await sendEmail({
-      to: email,
-      subject: "New Login Detected 🔒",
-      html: `
-        <p>You just logged into your account.</p>
-        <p>If this wasn't you, please secure your account immediately.</p>
-      `
+    const user = User[0];
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Login successful - return user info (without password)
+    res.json({
+      message: "Login successful",
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        email: user.email,
+      },
     });
-
-    res.json({ message: "User logged in successfully" });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Login failed" });
+    console.error("Login error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 

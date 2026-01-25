@@ -1,11 +1,571 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Timeline</title>
-    
-    </head>  
-    
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Timeline</title>
+
+  <style>
+    /* ===== Reset / basics ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 30px; padding-top: 20px; }
+    h1 {
+      font-size: 2.5rem;
+      color: #2c3e50;
+      margin-bottom: 10px;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+    }
+    .subtitle { color: #7f8c8d; font-size: 1.1rem; }
+
+    /* ===== Scroll area (invisible scrollbar) ===== */
+    .timeline-container {
+      position: relative;
+      height: 320px;
+      margin: 30px 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 20px 0;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
+
+      scrollbar-width: none;        /* Firefox */
+      -ms-overflow-style: none;     /* old Edge/IE */
+    }
+    .timeline-container::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
+
+    /* ===== Timeline content ===== */
+    .timeline {
+      position: relative;           /* anchor rope */
+      display: flex;
+      align-items: center;
+      height: 100%;
+      z-index: 2;
+      min-width: 1200px;            /* JS will adjust */
+      padding: 0 40px;              /* breathing room at ends */
+    }
+
+    /* ✅ Rope lives INSIDE .timeline so it never disappears */
+    .timeline-rope {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+
+      /* 🌊 Gradient blue rope */
+      background: linear-gradient(
+        90deg,
+        #d7efff 0%,
+        #9dd0ff 25%,
+        #4a90e2 50%,
+        #9dd0ff 75%,
+        #d7efff 100%
+      );
+
+      box-shadow:
+        0 6px 14px rgba(0, 90, 170, 0.18),
+        inset 0 1px 4px rgba(255,255,255,0.7);
+
+      z-index: 1;
+    }
+
+    /* ===== Polaroids ===== */
+    .moment {
+      position: relative;
+      margin: 0 40px;
+      transform: rotate(-2deg);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      cursor: pointer;
+      z-index: 3; /* above the rope */
+      flex: 0 0 auto;
+    }
+    .moment:hover {
+      transform: rotate(2deg) scale(1.05);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+      z-index: 10;
+    }
+
+    .polaroid {
+      background: white;
+      padding: 15px;
+      width: 180px;
+      border-radius: 6px;
+      border: 1px solid #eee;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+      text-align: center;
+      position: relative;
+    }
+
+    .polaroid::before {
+      content: "";
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 20px;
+      background: #e74c3c;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(231,76,60,0.5);
+    }
+
+    .photo-placeholder {
+      width: 100%;
+      height: 140px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(0,0,0,0.10);
+      overflow: hidden;
+    }
+    .photo-placeholder img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .photo-placeholder i {
+      color: rgba(0,0,0,0.30);
+      font-size: 2rem;
+    }
+
+    .caption {
+      font-size: 0.9rem;
+      color: #7f8c8d;
+      font-style: italic;
+      min-height: 20px;
+    }
+
+    .date-badge {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #2c3e50;
+      opacity: 0.8;
+    }
+
+    .instructions {
+      text-align: center;
+      color: #7f8c8d;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    /* ===== Floating add button ===== */
+    .add-moment-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3498db, #2ecc71);
+      color: white;
+      border: none;
+      font-size: 2rem;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.20);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .add-moment-btn:hover {
+      transform: scale(1.1) rotate(90deg);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    }
+
+    /* ===== Modal ===== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+
+    .modal h2 {
+      font-size: 1.2rem;
+      color: #2c3e50;
+      margin-bottom: 12px;
+    }
+
+    .field { margin-bottom: 12px; }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      color: #2c3e50;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"], input[type="date"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d7dbe3;
+      border-radius: 10px;
+      outline: none;
+      font-size: 0.95rem;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .btn.cancel { background: #ecf0f1; color: #2c3e50; }
+    .btn.save { background: #2ecc71; color: #fff; }
+
+    .error {
+      display: none;
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: #c0392b;
+      background: rgba(192,57,43,0.08);
+      border: 1px solid rgba(192,57,43,0.25);
+      padding: 8px 10px;
+      border-radius: 10px;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 2rem; }
+      .moment { margin: 0 30px; }
+      .polaroid { width: 150px; }
+    }
+  </style>
+</head>
+
 <body>
-    </body>
-    
+  <div class="container">
+    <header>
+      <h1>Memory Timeline</h1>
+      <p class="subtitle">Scroll horizontally to explore your moments</p>
+    </header>
+
+    <div class="timeline-container" id="timelineScroll">
+      <div class="timeline" id="timeline">
+        <div class="timeline-rope"></div>
+        <!-- moments inserted by JS -->
+      </div>
+    </div>
+
+    <div class="instructions">
+      <p>← Scroll left and right to navigate through your memories →</p>
+    </div>
+  </div>
+
+  <button class="add-moment-btn" id="addMomentBtn">+</button>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Add a moment</h2>
+
+      <div class="field">
+        <label for="captionInput">Caption</label>
+        <input id="captionInput" type="text" placeholder="e.g., Birthday dinner" maxlength="40" />
+      </div>
+
+      <div class="field">
+        <label for="dateInput">Date</label>
+        <input id="dateInput" type="date" />
+      </div>
+
+      <div class="error" id="errorBox"></div>
+
+      <div class="modal-actions">
+        <button class="btn cancel" id="cancelBtn" type="button">Cancel</button>
+        <button class="btn save" id="saveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "";
+    let currentUser = null;
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // Check if user is logged in
+      const userStr = sessionStorage.getItem('user');
+      if (!userStr) {
+        // Redirect to login if not authenticated
+        window.location.href = '/login';
+        return;
+      }
+
+      try {
+        currentUser = JSON.parse(userStr);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+        window.location.href = '/login';
+        return;
+      }
+
+      const scrollArea = document.getElementById("timelineScroll");
+      const timeline = document.getElementById("timeline");
+      const addBtn = document.getElementById("addMomentBtn");
+
+      const modalBackdrop = document.getElementById("modalBackdrop");
+      const captionInput = document.getElementById("captionInput");
+      const dateInput = document.getElementById("dateInput");
+      const cancelBtn = document.getElementById("cancelBtn");
+      const saveBtn = document.getElementById("saveBtn");
+      const errorBox = document.getElementById("errorBox");
+
+      if (!scrollArea || !timeline || !addBtn || !modalBackdrop || !captionInput || !dateInput || !cancelBtn || !saveBtn || !errorBox) {
+        console.error("Missing required elements.");
+        return;
+      }
+
+      // ✅ Today's date (local) in YYYY-MM-DD
+      const todayISO = toISODate(new Date());
+
+      // Block future dates in the date picker
+      dateInput.max = todayISO;
+      dateInput.value = todayISO;
+
+      // Load user's moments from database
+      await loadUserMoments();
+
+      adjustTimelineWidth();
+
+      // Open modal
+      addBtn.addEventListener("click", openModal);
+
+      // Close modal
+      cancelBtn.addEventListener("click", closeModal);
+      modalBackdrop.addEventListener("click", (e) => {
+        if (e.target === modalBackdrop) closeModal();
+      });
+
+      // Save
+      saveBtn.addEventListener("click", async () => {
+        const caption = captionInput.value.trim() || "New Memory";
+        const dateISO = dateInput.value;
+
+        const v = validateNotFuture(dateISO, todayISO);
+        if (!v.ok) return showError(v.msg);
+
+        hideError();
+        await addMoment({ caption, dateISO }, { scrollToIt: true, saveToDB: true });
+        closeModal();
+      });
+
+      // Keyboard controls inside modal
+      modalBackdrop.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal();
+        if (e.key === "Enter") saveBtn.click();
+      });
+
+      // ---------- functions ----------
+      function openModal() {
+        captionInput.value = "";
+        dateInput.value = todayISO;
+        hideError();
+        modalBackdrop.style.display = "flex";
+        captionInput.focus();
+      }
+
+      function closeModal() {
+        modalBackdrop.style.display = "none";
+        hideError();
+      }
+
+      // Load moments from API
+      async function loadUserMoments() {
+        try {
+          const response = await fetch(`${API_BASE}/api/moments?user_id=${currentUser.user_id}`);
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error loading moments:', data.error);
+            return;
+          }
+          
+          // Clear existing moments
+          timeline.innerHTML = '<div class="timeline-rope"></div>';
+          
+          // Add moments from database
+          if (data.moments && data.moments.length > 0) {
+            data.moments.forEach(moment => {
+              addMomentToTimeline(moment, { scrollToIt: false, saveToDB: false });
+            });
+          } else {
+            // Show message if no moments
+            const emptyMsg = document.createElement('div');
+            emptyMsg.style.textAlign = 'center';
+            emptyMsg.style.color = '#7f8c8d';
+            emptyMsg.style.padding = '40px';
+            emptyMsg.style.width = '100%';
+            emptyMsg.textContent = 'No moments yet. Click the + button to add your first moment!';
+            timeline.appendChild(emptyMsg);
+          }
+          
+          adjustTimelineWidth();
+        } catch (error) {
+          console.error('Error fetching moments:', error);
+        }
+      }
+
+      async function addMoment(moment, opts = { scrollToIt: true, saveToDB: true }) {
+        const { caption, dateISO } = moment;
+
+        // Final safety check (prevents future moments even programmatically)
+        const v = validateNotFuture(dateISO, todayISO);
+        if (!v.ok) return showError(v.msg);
+
+        const momentDiv = document.createElement("div");
+        momentDiv.className = "moment";
+        momentDiv.dataset.date = dateISO;
+
+        const imageUrl = moment.moments_url || null;
+        const imageContent = imageUrl 
+          ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
+          : '<i>📷</i>';
+
+        momentDiv.innerHTML = `
+          <div class="polaroid">
+            <div class="photo-placeholder" style="background-color:${randomPastel()}">
+              ${imageContent}
+            </div>
+            <div class="caption">${escapeHTML(caption)}</div>
+            <div class="date-badge">${formatDate(dateISO)}</div>
+          </div>
+        `;
+
+        timeline.appendChild(momentDiv);
+
+        // Save to database if this is a new moment
+        if (opts.saveToDB && currentUser) {
+          try {
+            const response = await fetch(`${API_BASE}/api/moments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: currentUser.user_id,
+                description: caption,
+                moments_url: imageUrl,
+                date: dateISO,
+                reminder: 0
+              })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+              console.error('Error saving moment:', data.error);
+              showError(data.error || 'Failed to save moment. Please try again.');
+              return;
+            }
+          } catch (error) {
+            console.error('Error saving moment to database:', error);
+            showError('Unable to save moment. Please try again.');
+            return;
+          }
+        }
+
+        adjustTimelineWidth();
+
+        if (opts.scrollToIt) {
+          scrollToMoment(momentDiv);
+        }
+      }
+
+      // Function to add a moment from database (already saved)
+      function addMomentToTimeline(momentData, opts = { scrollToIt: false, saveToDB: false }) {
+        const caption = momentData.description || momentData.caption || 'Untitled Moment';
+        const dateISO = momentData.date || momentData.created_at ? momentData.created_at.split('T')[0] : toISODate(new Date());
+        
+        addMoment({ caption, dateISO, moments_url: momentData.moments_url }, opts);
+      }
+
+      function adjustTimelineWidth() {
+        // include rope padding; each moment is ~180 + 80 margins => ~260
+        const count = timeline.querySelectorAll(".moment").length;
+        timeline.style.minWidth = `${Math.max(1200, count * 260)}px`;
+      }
+
+      function scrollToMoment(el) {
+        const target = el.offsetLeft - (scrollArea.clientWidth / 2) + (el.offsetWidth / 2);
+        scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+      }
+
+      function validateNotFuture(dateISO, todayISO) {
+        if (!dateISO) return { ok: false, msg: "Please choose a date." };
+        if (dateISO > todayISO) {
+          return { ok: false, msg: `You can't add a moment in the future. Today is ${formatDate(todayISO)}.` };
+        }
+        return { ok: true, msg: "" };
+      }
+
+      function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+      }
+
+      function hideError() {
+        errorBox.textContent = "";
+        errorBox.style.display = "none";
+      }
+
+      function randomPastel() {
+        const colors = ["#FF9AA2","#FFB7B2","#FFDAC1","#E2F0CB","#B5EAD7","#C7CEEA","#F8B195","#F67280","#C06C84","#6C5B7B"];
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      function escapeHTML(str) {
+        return String(str).replace(/[&<>"']/g, (m) => ({
+          "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+        }[m]));
+      }
+
+      function toISODate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      function formatDate(iso) {
+        const [y, m, d] = iso.split("-").map(Number);
+        return `${m}/${d}/${y}`; // MM/DD/YYYY
+      }
+    });
+  </script>
+</body>
 </html>
