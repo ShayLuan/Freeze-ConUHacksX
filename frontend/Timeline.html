@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Timeline</title>
+  <title>Freeze Your Memories</title>
 
-<style>
+  
+  <style>
+  
+
   /* ===== Freeze Theme (light, matches homepage) ===== */
   :root{
     --freeze-bg1:#f3f8fe;
@@ -27,25 +30,19 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body{
-    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, var(--freeze-bg1) 0%, var(--freeze-bg2) 40%, var(--freeze-bg3) 100%);
-    min-height:100vh;
-    padding:20px;
-    overflow-x:hidden;
-    color: var(--freeze-text);
-  }
+  font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, var(--freeze-bg1) 0%, var(--freeze-bg2) 40%, var(--freeze-bg3) 100%);
+  min-height:100vh;
+  padding:20px;
+  overflow-x:hidden;
+  color: #2c3e50; /*  normal default text color */
+}
+
 
   .container{ max-width:1200px; margin:0 auto; }
 
   header{ text-align:center; margin-bottom:30px; padding-top:20px; }
-
-  h1{
-    font-size:2.5rem;
-    color:var(--freeze-text);
-    margin-bottom:10px;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.08);
-    letter-spacing: 0.5px;
-  }
+  
 
   .subtitle{
     color:var(--freeze-muted);
@@ -336,13 +333,15 @@
     .polaroid{ width:150px; }
   }
 </style>
+
 </head>
 
 <body>
   <div class="container">
     <header>
-      <h1>Memory Timeline</h1>
+      <h1>Freeze Your Memories</h1>
       <p class="subtitle">Scroll horizontally to explore your moments</p>
+      
     </header>
 
     <div class="timeline-container" id="timelineScroll">
@@ -659,6 +658,8 @@
 
         // Insert moment in chronological order (oldest to newest)
         insertMomentInOrder(momentDiv, dateISO);
+        // Insert moment in chronological order (oldest to newest)
+        insertMomentInOrder(momentDiv, dateISO);
 
         adjustTimelineWidth();
 
@@ -699,14 +700,15 @@
         scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
       }
 
-      // Insert in reverse chronological order (newest first)
+      // chronological order
       function insertMomentInOrder(momentDiv, dateISO) {
         const existingMoments = Array.from(timeline.querySelectorAll('.moment'));
         
+        // position finder 
         let insertBefore = null;
         for (let i = 0; i < existingMoments.length; i++) {
           const existingDate = existingMoments[i].dataset.date;
-          if (existingDate && dateISO > existingDate) {
+          if (existingDate && dateISO < existingDate) {
             insertBefore = existingMoments[i];
             break;
           }
@@ -716,6 +718,7 @@
         if (insertBefore) {
           timeline.insertBefore(momentDiv, insertBefore);
         } else {
+          // If no earlier moment found, append to end
           timeline.appendChild(momentDiv);
         }
       }
