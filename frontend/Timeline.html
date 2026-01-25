@@ -172,6 +172,15 @@
     height:220px;
   }
 
+  /* Delete pin for stacks - just the polaroid on top */
+  .stack-container .delete-pin{
+    position:absolute;
+    top:-15px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:25;
+  }
+
   .stack-polaroid{
     position:absolute;
     top:0;
@@ -293,8 +302,8 @@
     position:relative;
   }
 
-  .polaroid::before{
-    content:"";
+  /* Delete pin button */
+  .delete-pin{
     position:absolute;
     top:-15px;
     left:50%;
@@ -304,6 +313,43 @@
     background:#e74c3c;
     border-radius:50%;
     box-shadow: 0 0 10px rgba(231,76,60,0.45);
+    border:none;
+    cursor:pointer;
+    z-index:20;
+    transition: transform 0.2s ease, width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease;
+    padding:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .delete-pin:hover{
+    transform:translateX(-50%) scale(1.3);
+    box-shadow: 0 0 15px rgba(231,76,60,0.6);
+  }
+
+  .delete-pin:active{
+    transform:translateX(-50%) scale(1.1);
+  }
+
+    /* delete animation*/
+  .delete-pin.unpinning{
+    animation: unpin 0.5s ease-out forwards;
+  }
+
+  @keyframes unpin {
+    0% {
+      transform: translateX(-50%) translateY(0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translateX(-50%) translateY(-30px) scale(0.8);
+      opacity: 0.7;
+    }
+    100% {
+      transform: translateX(-50%) translateY(-60px) scale(0.3);
+      opacity: 0;
+    }
   }
 
   .photo-placeholder{
@@ -817,6 +863,10 @@
         
         let currentIndex = 0;
         
+        // Store moments_id for each moment in the stack
+        const momentsIds = moments.map(m => m.moments_id);
+        stackContainer.dataset.momentsIds = JSON.stringify(momentsIds);
+        
         // Create polaroids for each moment in the stack
         moments.forEach((momentData, index) => {
           const caption = momentData.description || momentData.caption || 'Untitled Moment';
@@ -825,6 +875,7 @@
           const polaroidDiv = document.createElement("div");
           polaroidDiv.className = `stack-polaroid ${index === 0 ? 'stack-active' : ''}`;
           polaroidDiv.dataset.momentIndex = index;
+          polaroidDiv.dataset.momentsId = momentData.moments_id;
           
           const imageContent = imageUrl 
             ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
@@ -840,6 +891,20 @@
           
           stackContainer.appendChild(polaroidDiv);
         });
+        
+        // delet button for the stack
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-pin";
+        deleteBtn.setAttribute("aria-label", "Delete moment");
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const activePolaroid = stackContainer.querySelector('.stack-polaroid.stack-active');
+          if (activePolaroid) {
+            const momentsId = activePolaroid.dataset.momentsId;
+            handleDeleteMoment(momentsId, stackDiv);
+          }
+        });
+        stackContainer.appendChild(deleteBtn);
         
         // Add navigation dots if more than 1 moment
         if (moments.length > 1) {
@@ -865,14 +930,16 @@
           
           // Add click handler to flip through stack
           stackContainer.addEventListener('click', (e) => {
-            if (!e.target.closest('.stack-nav')) {
-              currentIndex = (currentIndex + 1) % moments.length;
-              flipToIndex(stackContainer, currentIndex);
-              // Update active dot
-              navDiv.querySelectorAll('.stack-dot').forEach((d, i) => {
-                d.classList.toggle('active', i === currentIndex);
-              });
+            // Don't flip if clicking on delete button or navigation
+            if (e.target.closest('.delete-pin') || e.target.closest('.stack-nav')) {
+              return;
             }
+            currentIndex = (currentIndex + 1) % moments.length;
+            flipToIndex(stackContainer, currentIndex);
+            // Update active dot
+            navDiv.querySelectorAll('.stack-dot').forEach((d, i) => {
+              d.classList.toggle('active', i === currentIndex);
+            });
           });
         }
         
@@ -895,7 +962,7 @@
       }
 
       async function addMoment(moment, opts = { scrollToIt: true, saveToDB: true }) {
-        const { caption, dateISO, imageFile, moments_url } = moment;
+        const { caption, dateISO, imageFile, moments_url, moments_id } = moment;
 
         // Final safety check (prevents future moments even programmatically)
         const v = validateNotFuture(dateISO, todayISO);
@@ -970,6 +1037,9 @@
         const momentDiv = document.createElement("div");
         momentDiv.className = "moment";
         momentDiv.dataset.date = dateISO;
+        if (moments_id) {
+          momentDiv.dataset.momentsId = moments_id;
+        }
 
         const imageContent = imageUrl 
           ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
@@ -977,6 +1047,7 @@
 
         momentDiv.innerHTML = `
           <div class="polaroid">
+            ${moments_id ? `<button class="delete-pin" data-moments-id="${moments_id}" aria-label="Delete moment"></button>` : ''}
             <div class="photo-placeholder" style="background-color:${randomPastel()}">
               ${imageContent}
             </div>
@@ -984,6 +1055,15 @@
             <div class="date-badge">${formatDate(dateISO)}</div>
           </div>
         `;
+
+        // Add delete button click handler if moments_id exists
+        if (moments_id) {
+          const deleteBtn = momentDiv.querySelector('.delete-pin');
+          deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleDeleteMoment(moments_id, momentDiv);
+          });
+        }
 
         // Insert moment in chronological order (oldest to newest)
         insertMomentInOrder(momentDiv, dateISO);
@@ -1012,8 +1092,53 @@
         }
         dateISO = String(dateISO).trim();
 
-        // Pass moments_url (can be empty string, which is valid)
-        addMoment({ caption, dateISO, moments_url: momentData.moments_url }, opts);
+        // Pass moments_url (can be empty string, which is valid) and moments_id
+        addMoment({ 
+          caption, 
+          dateISO, 
+          moments_url: momentData.moments_url,
+          moments_id: momentData.moments_id 
+        }, opts);
+      }
+
+      // Handle delete moment with confirmation and animation
+      async function handleDeleteMoment(momentsId, momentElement) {
+        // Find the delete button
+        const deleteBtn = momentElement.querySelector('.delete-pin');
+        if (!deleteBtn) return;
+
+        // Confirm deletion
+        const confirmed = confirm('Are you sure you want to delete this moment? This action cannot be undone.');
+        if (!confirmed) return;
+
+        // Add unpin animation
+        deleteBtn.classList.add('unpinning');
+        
+        // Wait for animation to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+          // Call DELETE API
+          const response = await fetch(`${API_BASE}/api/moments/${momentsId}?user_id=${currentUser.user_id}`, {
+            method: 'DELETE'
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error deleting moment:', data.error);
+            showError(data.error || 'Failed to delete moment. Please try again.');
+            deleteBtn.classList.remove('unpinning');
+            return;
+          }
+
+          // Reload moments from database to update timeline
+          await loadUserMoments();
+        } catch (error) {
+          console.error('Error deleting moment:', error);
+          showError('Unable to delete moment. Please try again.');
+          deleteBtn.classList.remove('unpinning');
+        }
       }
 
       function adjustTimelineWidth() {
