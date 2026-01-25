@@ -61,7 +61,7 @@
         if (data.user) {
           sessionStorage.setItem("user", JSON.stringify(data.user));
         }
-        window.location.href = "/";
+        window.location.href = "/timeline";
       } catch (err) {
         showLoginError("Unable to reach server. Please try again.");
       }

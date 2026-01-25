@@ -1,23 +1,1102 @@
 <!DOCTYPE html>
 <html lang="en">
-    
 <head>
-    <title> Moments </title>
-    <link rel="stylesheet" href="Timeline.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Timeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet">
 
-    </head>
-    
+<style>
+  /* ===== Freeze Theme (light, matches homepage) ===== */
+  :root{
+    --freeze-bg1:#f3f8fe;
+    --freeze-bg2:#e6f0fa;
+    --freeze-bg3:#dde9f7;
+
+    --freeze-card: rgba(255,255,255,0.92);
+    --freeze-border: rgba(123,184,255,0.25);
+
+    --freeze-primary:#7bb8ff;
+    --freeze-secondary:#b7dcff;
+    --freeze-accent:#4a90e2;
+
+    --freeze-text:#2c3e50;
+    --freeze-muted:#7f9db5;
+  }
+
+  /* ===== Reset / basics ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body{
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--freeze-bg1) 0%, var(--freeze-bg2) 40%, var(--freeze-bg3) 100%);
+    min-height:100vh;
+    padding:20px;
+    overflow-x:hidden;
+    color: var(--freeze-text);
+  }
+
+  .container{ max-width:1200px; margin:0 auto; }
+  
+  /* Remove max-width constraint for container when it contains timeline */
+  .container:has(.timeline-container){
+    max-width:none;
+    width:100%;
+    padding:0 20px; /* Maintain some side padding */
+  }
+
+  header{ text-align:center; margin-bottom:30px; padding-top:20px; }
+
+  h1{
+    font-family: 'Playfair Display', serif;
+    font-size:2.5rem;
+    font-weight:900;
+    color:#8ac6d1;
+    margin-bottom:10px;
+    text-shadow: 0 2px 10px rgba(138, 198, 209, 0.3);
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle{
+    color:var(--freeze-muted);
+    font-size:1.1rem;
+  }
+
+  /* ===== Scroll area (invisible scrollbar) ===== */
+  .timeline-container{
+    position:relative;
+    height:400px;
+    margin:30px 0;
+    overflow-x:auto;
+    overflow-y:visible;
+    padding:80px 0;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
+
+    scrollbar-width:none;        /* Firefox */
+    -ms-overflow-style:none;     /* old Edge/IE */
+  }
+  .timeline-container::-webkit-scrollbar{ display:none; } /* Chrome/Safari/Edge */
+
+  /* ===== Timeline content ===== */
+  .timeline{
+    position:relative;           /* anchor rope */
+    display:flex;
+    align-items:center;
+    height:100%;
+    z-index:2;
+    min-width:1200px;            /* JS will adjust */
+    padding:0 300px 0 40px;      /* extra right padding for infinite scroll effect */
+    overflow:visible;            /* Allow shadows to extend beyond */
+  }
+
+  /* ✅ Rope inside timeline so it never disappears */
+  .timeline-rope{
+    position:absolute;
+    top:50%;
+    left:0;
+    width:100%;
+    height:8px;
+    transform:translateY(-50%);
+    border-radius:999px;
+
+    background: linear-gradient(
+      90deg,
+      #eaf4ff 0%,
+      var(--freeze-secondary) 30%,
+      var(--freeze-primary) 50%,
+      var(--freeze-secondary) 70%,
+      #eaf4ff 100%
+    );
+
+    box-shadow:
+      0 4px 12px rgba(123,184,255,0.35),
+      inset 0 1px 4px rgba(255,255,255,0.85);
+
+    z-index:1;
+  }
+
+  /* ===== Polaroids ===== */
+  .moment{
+    position:relative;
+    margin:0 40px;
+    transform:rotate(-2deg);
+    transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease, opacity 0.35s ease;
+    cursor:pointer;
+    z-index:3;
+    flex:0 0 auto;
+  }
+
+  /* When any polaroid is hovered, blur the others ("out of focus") */
+  .timeline:has(.moment:hover) .moment:not(:hover),
+  .timeline:has(.moment-stack:hover) .moment:not(:hover),
+  .timeline:has(.moment:hover) .moment-stack:not(:hover),
+  .timeline:has(.moment-stack:hover) .moment-stack:not(:hover) {
+    filter: blur(3px);
+    opacity: 0.85;
+    transform: rotate(-2deg) scale(0.95);
+  }
+
+  .moment:hover{
+    transform: rotate(2deg) scale(1.2);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.22);
+    filter: none;
+    opacity: 1;
+    z-index:10;
+  }
+
+  /* ===== Stacked Polaroids (same day) ===== */
+  .moment-stack{
+    position:relative;
+    margin:0 40px;
+    transform:rotate(-2deg);
+    transition: transform 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease, opacity 0.35s ease;
+    cursor:pointer;
+    z-index:3;
+    flex:0 0 auto;
+  }
+
+  .moment-stack:hover{
+    transform: rotate(2deg) scale(1.2);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.22);
+    filter: none;
+    opacity: 1;
+    z-index:10;
+  }
+
+  .stack-container{
+    position:relative;
+    width:180px;
+    height:220px;
+  }
+
+  .stack-polaroid{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    background: var(--freeze-card);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding:15px;
+    border-radius:10px;
+    border:1px solid var(--freeze-border);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(255,255,255,0.55);
+    text-align:center;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+    transform-origin: center center;
+  }
+
+  /* Visible corners for stacked polaroids - show all layers with slight offsets */
+  .stack-polaroid:nth-child(1){
+    transform: rotate(-4deg) translateY(-3px);
+    z-index:5;
+  }
+  .stack-polaroid:nth-child(2){
+    transform: rotate(3deg) translateY(3px);
+    z-index:4;
+  }
+  .stack-polaroid:nth-child(3){
+    transform: rotate(-2deg) translateY(6px);
+    z-index:3;
+  }
+  .stack-polaroid:nth-child(4){
+    transform: rotate(2deg) translateY(9px);
+    z-index:2;
+  }
+  .stack-polaroid:nth-child(n+5){
+    transform: rotate(-1deg) translateY(12px);
+    z-index:1;
+  }
+
+  /* Active polaroid is fully visible, centered, and on top */
+  .stack-polaroid.stack-active{
+    opacity:1 !important;
+    transform: rotate(0deg) translateY(0) scale(1) !important;
+    z-index:15 !important;
+    pointer-events:auto;
+  }
+
+  /* Non-active polaroids: corners visible but slightly dimmed */
+  .stack-polaroid:not(.stack-active){
+    opacity:0.6;
+    pointer-events:none;
+  }
+
+  .stack-nav{
+    position:absolute;
+    bottom:-30px;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    gap:8px;
+    align-items:center;
+    z-index:15;
+  }
+
+  .stack-dot{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background: var(--freeze-muted);
+    opacity:0.4;
+    cursor:pointer;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .stack-dot.active{
+    opacity:1;
+    transform:scale(1.3);
+    background: var(--freeze-primary);
+  }
+
+  .stack-dot:hover{
+    opacity:0.7;
+  }
+
+  .stack-container .stack-badge{
+    position:absolute;
+    top:-8px;
+    right:-8px;
+    background: var(--freeze-primary);
+    color:white;
+    border-radius:50%;
+    width:24px;
+    height:24px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:0.75rem;
+    font-weight:bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index:20;
+    pointer-events:none;
+  }
+
+  .polaroid{
+    background: var(--freeze-card);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+
+    padding:15px;
+    width:180px;
+    border-radius:10px;
+    border:1px solid var(--freeze-border);
+
+    box-shadow:
+      0 10px 25px rgba(0,0,0,0.12),
+      inset 0 0 0 1px rgba(255,255,255,0.55);
+
+    text-align:center;
+    position:relative;
+  }
+
+  .polaroid::before{
+    content:"";
+    position:absolute;
+    top:-15px;
+    left:50%;
+    transform:translateX(-50%);
+    width:20px;
+    height:20px;
+    background:#e74c3c;
+    border-radius:50%;
+    box-shadow: 0 0 10px rgba(231,76,60,0.45);
+  }
+
+  .photo-placeholder{
+    width:100%;
+    height:140px;
+    border-radius:8px;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid rgba(123,184,255,0.35);
+    overflow:hidden;
+
+    background: linear-gradient(135deg, #eaf4ff, #d6ebff);
+  }
+
+  .photo-placeholder img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  .photo-placeholder i{
+    color: rgba(44,62,80,0.35);
+    font-size:2rem;
+  }
+
+  .caption{
+    font-size:0.9rem;
+    color: var(--freeze-muted);
+    font-style: italic;
+    min-height:20px;
+  }
+
+  .date-badge{
+    margin-top:6px;
+    font-size:0.8rem;
+    color: var(--freeze-text);
+    opacity:0.75;
+  }
+
+  .instructions{
+    text-align:center;
+    color: var(--freeze-muted);
+    margin-top:8px;
+    font-size:0.95rem;
+  }
+
+  /* ===== Empty message ===== */
+  .empty-msg{
+    width:100%;
+    text-align:center;
+    color: var(--freeze-muted);
+    padding:40px;
+    z-index:3;
+  }
+
+  /* ===== Floating add button ===== */
+  .add-moment-btn{
+    position:fixed;
+    bottom:30px;
+    right:30px;
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    background: linear-gradient(135deg, var(--freeze-primary), var(--freeze-accent));
+    color:white;
+    border:none;
+    font-size:2rem;
+    cursor:pointer;
+
+    box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  }
+
+  .add-moment-btn:hover{
+    transform: scale(1.08) rotate(90deg);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.22);
+    filter: brightness(1.03);
+  }
+
+  /* ===== Modal ===== */
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    background: rgba(10,20,30,0.35);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:20px;
+  }
+
+  .modal{
+    width:100%;
+    max-width:420px;
+    background: rgba(255,255,255,0.94);
+    border-radius:16px;
+    padding:16px;
+    border: 1px solid rgba(123,184,255,0.25);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+
+    box-shadow: 0 25px 60px rgba(0,0,0,0.22);
+  }
+
+  .modal h2{
+    font-size:1.2rem;
+    color: var(--freeze-text);
+    margin-bottom:12px;
+  }
+
+  .field{ margin-bottom:12px; }
+
+  label{
+    display:block;
+    font-size:0.9rem;
+    color: var(--freeze-text);
+    margin-bottom:6px;
+    opacity:0.9;
+  }
+
+  input[type="text"], input[type="date"], input[type="url"]{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid rgba(123,184,255,0.35);
+    border-radius:12px;
+    outline:none;
+    font-size:0.95rem;
+    background: rgba(255,255,255,0.9);
+    color: var(--freeze-text);
+  }
+
+  input[type="text"]:focus, input[type="date"]:focus, input[type="url"]:focus{
+    border-color: rgba(74,144,226,0.7);
+    box-shadow: 0 0 0 3px rgba(123,184,255,0.25);
+  }
+
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+    margin-top:10px;
+  }
+
+  .btn{
+    border:none;
+    border-radius:12px;
+    padding:10px 12px;
+    cursor:pointer;
+    font-weight:700;
+  }
+
+  .btn.cancel{
+    background: rgba(236,240,241,0.95);
+    color: var(--freeze-text);
+  }
+
+  .btn.save{
+    background: linear-gradient(135deg, var(--freeze-primary), var(--freeze-accent));
+    color: #fff;
+  }
+
+  .error{
+    display:none;
+    margin-top:8px;
+    font-size:0.9rem;
+    color:#c0392b;
+    background: rgba(192,57,43,0.08);
+    border:1px solid rgba(192,57,43,0.25);
+    padding:8px 10px;
+    border-radius:12px;
+  }
+
+  @media (max-width: 768px){
+    h1{ font-size:2rem; }
+    .moment{ margin:0 30px; }
+    .polaroid{ width:150px; }
+  }
+</style>
+</head>
+
 <body>
-    <h1> Your Moments </h1>
-    <hr>
-    <div id="timeline-container">
+  <div class="container">
+    <header>
+      <h1>Memory Timeline</h1>
+    </header>
+
+    <div class="timeline-container" id="timelineScroll">
+      <div class="timeline" id="timeline">
+        <div class="timeline-rope"></div>
+        <!-- moments inserted by JS -->
+      </div>
     </div>
-    <div id="timeline-line"> </div> 
-    <button id="freeze-button" title="Freeze a moment!">
-    ❄️ </button>
-   
-      
-    </body>
 
+    <div class="instructions">
+      <p>← Scroll left and right to navigate through your memories →</p>
+    </div>
+  </div>
 
+  <button class="add-moment-btn" id="addMomentBtn">+</button>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Add a moment</h2>
+
+      <div class="field">
+        <label for="captionInput">Caption</label>
+        <input id="captionInput" type="text" placeholder="e.g., Birthday dinner" maxlength="40" />
+      </div>
+
+      <div class="field">
+        <label for="dateInput">Date</label>
+        <input id="dateInput" type="date" />
+      </div>
+
+      <div class="field">
+        <label for="imageInput">Image (optional)</label>
+        <input id="imageInput" type="file" accept="image/*" />
+        <div id="imagePreview" style="margin-top: 8px; display: none;">
+          <img id="previewImg" src="" alt="Preview" style="max-width: 100%; max-height: 150px; border-radius: 8px; border: 1px solid #ddd;" />
+        </div>
+      </div>
+
+      <div class="error" id="errorBox"></div>
+
+      <div class="modal-actions">
+        <button class="btn cancel" id="cancelBtn" type="button">Cancel</button>
+        <button class="btn save" id="saveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "";
+    let currentUser = null;
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // Check if user is logged in
+      const userStr = sessionStorage.getItem('user');
+      if (!userStr) {
+        // Redirect to login if not authenticated
+        window.location.href = '/login';
+        return;
+      }
+
+      try {
+        currentUser = JSON.parse(userStr);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+        window.location.href = '/login';
+        return;
+      }
+
+      const scrollArea = document.getElementById("timelineScroll");
+      const timeline = document.getElementById("timeline");
+      const addBtn = document.getElementById("addMomentBtn");
+
+      const modalBackdrop = document.getElementById("modalBackdrop");
+      const captionInput = document.getElementById("captionInput");
+      const dateInput = document.getElementById("dateInput");
+      const imageInput = document.getElementById("imageInput");
+      const imagePreview = document.getElementById("imagePreview");
+      const previewImg = document.getElementById("previewImg");
+      const cancelBtn = document.getElementById("cancelBtn");
+      const saveBtn = document.getElementById("saveBtn");
+      const errorBox = document.getElementById("errorBox");
+
+      if (!scrollArea || !timeline || !addBtn || !modalBackdrop || !captionInput || !dateInput || !imageInput || !cancelBtn || !saveBtn || !errorBox) {
+        console.error("Missing required elements.");
+        return;
+      }
+
+      // ===== Drag to scroll functionality =====
+      let isDragging = false;
+      let startX = 0;
+      let scrollLeft = 0;
+
+      scrollArea.addEventListener('mousedown', (e) => {
+        // Don't start dragging if clicking on interactive elements (polaroids, buttons, etc.)
+        if (e.target.closest('.moment, .moment-stack, .stack-nav, .stack-dot, button, a')) {
+          return;
+        }
+        
+        isDragging = true;
+        scrollArea.style.cursor = 'grabbing';
+        scrollArea.style.userSelect = 'none';
+        
+        startX = e.pageX - scrollArea.offsetLeft;
+        scrollLeft = scrollArea.scrollLeft;
+        
+        e.preventDefault();
+      });
+
+      scrollArea.addEventListener('mouseleave', () => {
+        isDragging = false;
+        scrollArea.style.cursor = 'grab';
+        scrollArea.style.userSelect = '';
+      });
+
+      scrollArea.addEventListener('mouseup', () => {
+        isDragging = false;
+        scrollArea.style.cursor = 'grab';
+        scrollArea.style.userSelect = '';
+      });
+
+      scrollArea.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        const x = e.pageX - scrollArea.offsetLeft;
+        const walk = (x - startX) * 2; // Multiply by 2 for faster scrolling
+        scrollArea.scrollLeft = scrollLeft - walk;
+      });
+
+      // Set initial cursor style
+      scrollArea.style.cursor = 'grab';
+
+      // ✅ Today's date (local) in YYYY-MM-DD
+      const todayISO = toISODate(new Date());
+
+      // Block future dates in the date picker
+      dateInput.max = todayISO;
+      dateInput.value = todayISO;
+
+      // Load user's moments from database
+      await loadUserMoments();
+
+      adjustTimelineWidth();
+
+      // Open modal
+      addBtn.addEventListener("click", openModal);
+
+      // Close modal
+      cancelBtn.addEventListener("click", closeModal);
+      modalBackdrop.addEventListener("click", (e) => {
+        if (e.target === modalBackdrop) closeModal();
+      });
+
+      // Image preview
+      imageInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            previewImg.src = e.target.result;
+            imagePreview.style.display = "block";
+          };
+          reader.readAsDataURL(file);
+        } else {
+          imagePreview.style.display = "none";
+        }
+      });
+
+      // Save
+      saveBtn.addEventListener("click", async () => {
+        const caption = captionInput.value.trim() || "New Memory";
+        const dateISO = dateInput.value;
+        const imageFile = imageInput.files[0];
+
+        const v = validateNotFuture(dateISO, todayISO);
+        if (!v.ok) return showError(v.msg);
+
+        hideError();
+        
+        // Disable save button while uploading
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+
+        try {
+          await addMoment({ caption, dateISO, imageFile }, { scrollToIt: true, saveToDB: true });
+          closeModal();
+          // Reload moments from database to ensure consistency
+          await loadUserMoments();
+        } catch (error) {
+          showError("Failed to save moment. Please try again.");
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        }
+      });
+
+      // Keyboard controls inside modal
+      modalBackdrop.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal();
+        if (e.key === "Enter") saveBtn.click();
+      });
+
+      // ---------- functions ----------
+      function openModal() {
+        captionInput.value = "";
+        dateInput.value = todayISO;
+        imageInput.value = "";
+        imagePreview.style.display = "none";
+        hideError();
+        modalBackdrop.style.display = "flex";
+        captionInput.focus();
+      }
+
+      function closeModal() {
+        modalBackdrop.style.display = "none";
+        hideError();
+        // Reset form
+        imageInput.value = "";
+        imagePreview.style.display = "none";
+      }
+
+      // Load moments from API
+      async function loadUserMoments() {
+        try {
+          console.log('Loading moments for user_id:', currentUser.user_id);
+          const response = await fetch(`${API_BASE}/api/moments?user_id=${currentUser.user_id}`);
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Error loading moments:', response.status, errorData);
+            showError('Failed to load moments. Please refresh the page.');
+            return;
+          }
+          
+          const data = await response.json();
+          console.log('Loaded moments:', data.moments?.length || 0, 'moments');
+          
+          // Clear existing moments
+          timeline.innerHTML = '<div class="timeline-rope"></div>';
+          
+          // Group moments by date
+          if (data.moments && data.moments.length > 0) {
+            const groupedByDate = groupMomentsByDate(data.moments);
+            
+            // Sort dates (newest first)
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+            
+            // Render each date group
+            sortedDates.forEach(dateISO => {
+              const momentsForDate = groupedByDate[dateISO];
+              try {
+                if (momentsForDate.length === 1) {
+                  // Single moment - render normally
+                  addMomentToTimeline(momentsForDate[0], { scrollToIt: false, saveToDB: false });
+                } else {
+                  // Multiple moments - render as stack
+                  renderMomentStack(dateISO, momentsForDate);
+                }
+              } catch (err) {
+                console.error('Error adding moment group to timeline:', err, momentsForDate);
+              }
+            });
+          } else {
+            // Show message if no moments
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'empty-msg';
+            emptyMsg.textContent = 'No moments yet. Click the + button to add your first moment!';
+            timeline.appendChild(emptyMsg);
+          }
+          
+          adjustTimelineWidth();
+        } catch (error) {
+          console.error('Error fetching moments:', error);
+          showError('Unable to load moments. Please refresh the page.');
+        }
+      }
+
+      // Group moments by date (YYYY-MM-DD)
+      function groupMomentsByDate(moments) {
+        const grouped = {};
+        moments.forEach(moment => {
+          let dateISO = moment.date;
+          if (!dateISO && moment.created_at) {
+            dateISO = moment.created_at.split('T')[0];
+          }
+          if (!dateISO) {
+            dateISO = toISODate(new Date());
+          }
+          // Normalize to YYYY-MM-DD
+          if (typeof dateISO === "string" && dateISO.includes("T")) {
+            dateISO = dateISO.split("T")[0];
+          }
+          dateISO = String(dateISO).trim();
+          
+          if (!grouped[dateISO]) {
+            grouped[dateISO] = [];
+          }
+          grouped[dateISO].push(moment);
+        });
+        return grouped;
+      }
+
+      // Render a stack of polaroids for the same date
+      function renderMomentStack(dateISO, moments) {
+        const stackDiv = document.createElement("div");
+        stackDiv.className = "moment-stack";
+        stackDiv.dataset.date = dateISO;
+        
+        const stackContainer = document.createElement("div");
+        stackContainer.className = "stack-container";
+        
+        // Add badge showing number of photos in stack
+        if (moments.length > 1) {
+          const badge = document.createElement("div");
+          badge.className = "stack-badge";
+          badge.textContent = moments.length;
+          stackContainer.appendChild(badge);
+        }
+        
+        let currentIndex = 0;
+        
+        // Create polaroids for each moment in the stack
+        moments.forEach((momentData, index) => {
+          const caption = momentData.description || momentData.caption || 'Untitled Moment';
+          const imageUrl = momentData.moments_url || null;
+          
+          const polaroidDiv = document.createElement("div");
+          polaroidDiv.className = `stack-polaroid ${index === 0 ? 'stack-active' : ''}`;
+          polaroidDiv.dataset.momentIndex = index;
+          
+          const imageContent = imageUrl 
+            ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
+            : '<i>📷</i>';
+          
+          polaroidDiv.innerHTML = `
+            <div class="photo-placeholder" style="background-color:${randomPastel()}">
+              ${imageContent}
+            </div>
+            <div class="caption">${escapeHTML(caption)}</div>
+            <div class="date-badge">${formatDate(dateISO)}</div>
+          `;
+          
+          stackContainer.appendChild(polaroidDiv);
+        });
+        
+        // Add navigation dots if more than 1 moment
+        if (moments.length > 1) {
+          const navDiv = document.createElement("div");
+          navDiv.className = "stack-nav";
+          
+          moments.forEach((_, index) => {
+            const dot = document.createElement("div");
+            dot.className = `stack-dot ${index === 0 ? 'active' : ''}`;
+            dot.dataset.index = index;
+            dot.addEventListener('click', (e) => {
+              e.stopPropagation();
+              flipToIndex(stackContainer, index);
+              // Update active dot
+              navDiv.querySelectorAll('.stack-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === index);
+              });
+            });
+            navDiv.appendChild(dot);
+          });
+          
+          stackContainer.appendChild(navDiv);
+          
+          // Add click handler to flip through stack
+          stackContainer.addEventListener('click', (e) => {
+            if (!e.target.closest('.stack-nav')) {
+              currentIndex = (currentIndex + 1) % moments.length;
+              flipToIndex(stackContainer, currentIndex);
+              // Update active dot
+              navDiv.querySelectorAll('.stack-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === currentIndex);
+              });
+            }
+          });
+        }
+        
+        stackDiv.appendChild(stackContainer);
+        
+        // Insert in reverse chronological order
+        insertMomentInOrder(stackDiv, dateISO);
+      }
+
+      // Flip animation to show a specific polaroid in the stack
+      function flipToIndex(stackContainer, targetIndex) {
+        const polaroids = stackContainer.querySelectorAll('.stack-polaroid');
+        polaroids.forEach((polaroid, index) => {
+          if (index === targetIndex) {
+            polaroid.classList.add('stack-active');
+          } else {
+            polaroid.classList.remove('stack-active');
+          }
+        });
+      }
+
+      async function addMoment(moment, opts = { scrollToIt: true, saveToDB: true }) {
+        const { caption, dateISO, imageFile, moments_url } = moment;
+
+        // Final safety check (prevents future moments even programmatically)
+        const v = validateNotFuture(dateISO, todayISO);
+        if (!v.ok) return showError(v.msg);
+
+        let imageUrl = moments_url || null;
+
+        // Upload image to server if provided
+        if (opts.saveToDB && imageFile && currentUser) {
+          try {
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('user_id', currentUser.user_id);
+            formData.append('description', caption);
+            formData.append('date', dateISO);
+            formData.append('reminder', '0');
+
+            const response = await fetch(`${API_BASE}/api/moments`, {
+              method: 'POST',
+              body: formData
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+              console.error('Error saving moment:', data.error);
+              showError(data.error || 'Failed to save moment. Please try again.');
+              throw new Error(data.error || 'Failed to save moment');
+            }
+            
+            // Use the URL from the response if available
+            if (data.moment && data.moment.moments_url) {
+              imageUrl = data.moment.moments_url;
+            }
+          } catch (error) {
+            console.error('Error uploading moment:', error);
+            showError('Unable to save moment. Please try again.');
+            throw error;
+          }
+        } else if (opts.saveToDB && currentUser) {
+          // Save without image
+          try {
+            const response = await fetch(`${API_BASE}/api/moments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: currentUser.user_id,
+                description: caption,
+                moments_url: imageUrl,
+                date: dateISO,
+                reminder: 0
+              })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+              console.error('Error saving moment:', data.error);
+              showError(data.error || 'Failed to save moment. Please try again.');
+              throw new Error(data.error || 'Failed to save moment');
+            }
+            
+            if (data.moment && data.moment.moments_url) {
+              imageUrl = data.moment.moments_url;
+            }
+          } catch (error) {
+            console.error('Error saving moment to database:', error);
+            showError('Unable to save moment. Please try again.');
+            throw error;
+          }
+        }
+
+        // Create the moment display element
+        const momentDiv = document.createElement("div");
+        momentDiv.className = "moment";
+        momentDiv.dataset.date = dateISO;
+
+        const imageContent = imageUrl 
+          ? `<img src="${escapeHTML(imageUrl)}" alt="${escapeHTML(caption)}" onerror="this.parentElement.innerHTML='<i>📷</i>'">`
+          : '<i>📷</i>';
+
+        momentDiv.innerHTML = `
+          <div class="polaroid">
+            <div class="photo-placeholder" style="background-color:${randomPastel()}">
+              ${imageContent}
+            </div>
+            <div class="caption">${escapeHTML(caption)}</div>
+            <div class="date-badge">${formatDate(dateISO)}</div>
+          </div>
+        `;
+
+        // Insert moment in chronological order (oldest to newest)
+        insertMomentInOrder(momentDiv, dateISO);
+
+        adjustTimelineWidth();
+
+        if (opts.scrollToIt) {
+          scrollToMoment(momentDiv);
+        }
+      }
+
+      // Function to add a moment from database (already saved)
+      function addMomentToTimeline(momentData, opts = { scrollToIt: false, saveToDB: false }) {
+        const caption = momentData.description || momentData.caption || 'Untitled Moment';
+        // Use date field, or fallback to created_at date part, or use today
+        let dateISO = momentData.date;
+        if (!dateISO && momentData.created_at) {
+          dateISO = momentData.created_at.split('T')[0];
+        }
+        if (!dateISO) {
+          dateISO = toISODate(new Date());
+        }
+        // Normalize to YYYY-MM-DD (DB may return 2026-01-24T00:00:00.000Z)
+        if (typeof dateISO === "string" && dateISO.includes("T")) {
+          dateISO = dateISO.split("T")[0];
+        }
+        dateISO = String(dateISO).trim();
+
+        // Pass moments_url (can be empty string, which is valid)
+        addMoment({ caption, dateISO, moments_url: momentData.moments_url }, opts);
+      }
+
+      function adjustTimelineWidth() {
+        // include rope padding; each moment/stack is ~180 + 80 margins => ~260
+        // if padding doesn't fix this, i don't know what will
+        const count = timeline.querySelectorAll(".moment, .moment-stack").length;
+        timeline.style.minWidth = `${Math.max(1200, count * 260)}px`;
+      }
+
+      function scrollToMoment(el) {
+        const target = el.offsetLeft - (scrollArea.clientWidth / 2) + (el.offsetWidth / 2);
+        scrollArea.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+      }
+
+      // Insert in reverse chronological order (newest first)
+      function insertMomentInOrder(momentDiv, dateISO) {
+        const existingMoments = Array.from(timeline.querySelectorAll('.moment, .moment-stack'));
+        
+        let insertBefore = null;
+        for (let i = 0; i < existingMoments.length; i++) {
+          const existingDate = existingMoments[i].dataset.date;
+          if (existingDate && dateISO > existingDate) {
+            insertBefore = existingMoments[i];
+            break;
+          }
+        }
+        
+        // Insert at the correct position
+        if (insertBefore) {
+          timeline.insertBefore(momentDiv, insertBefore);
+        } else {
+          timeline.appendChild(momentDiv);
+        }
+      }
+
+      function validateNotFuture(dateISO, todayISO) {
+        if (!dateISO) return { ok: false, msg: "Please choose a date." };
+        if (dateISO > todayISO) {
+          return { ok: false, msg: `You can't add a moment in the future. Today is ${formatDate(todayISO)}.` };
+        }
+        return { ok: true, msg: "" };
+      }
+
+      function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+      }
+
+      function hideError() {
+        errorBox.textContent = "";
+        errorBox.style.display = "none";
+      }
+
+      function randomPastel() {
+        const colors = ["#FF9AA2","#FFB7B2","#FFDAC1","#E2F0CB","#B5EAD7","#C7CEEA","#F8B195","#F67280","#C06C84","#6C5B7B"];
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      function escapeHTML(str) {
+        return String(str).replace(/[&<>"']/g, (m) => ({
+          "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+        }[m]));
+      }
+
+      function toISODate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      function formatDate(iso) {
+        if (!iso) return "";
+        // why the f is the date an NaN
+        const datePart = typeof iso === "string" && iso.includes("T")
+          ? iso.split("T")[0]
+          : String(iso).trim();
+        const parts = datePart.split("-").map(Number);
+        if (parts.length < 3 || parts.some((n) => isNaN(n))) return datePart;
+        const [y, m, d] = parts;
+        return `${m}/${d}/${y}`; 
+      }
+    });
+  </script>
+</body>
 </html>
